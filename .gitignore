@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+.pytest_cache/
+# Browser profile holds the logged-in Shopee session cookies
+.auth/
+output/
