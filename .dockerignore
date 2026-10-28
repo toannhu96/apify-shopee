@@ -1,0 +1,17 @@
+*
+!requirements-actor.txt
+!requirements-service.txt
+!shopee_contracts.py
+!shopee_actor/
+!shopee_actor/**
+!shopee_service/
+!shopee_service/**
+!shopee_affiliate/
+!shopee_affiliate/**
+!.actor/
+!.actor/**
+!deploy/
+!deploy/Dockerfile
+**/__pycache__/
+**/*.pyc
+**/.env

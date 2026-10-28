@@ -1,0 +1,309 @@
+{
+  "actorSpecification": 1,
+  "fields": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "item_id": {
+        "type": "string",
+        "pattern": "^[1-9][0-9]{0,19}$"
+      },
+      "shop_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "category_id": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "name": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "image": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "discount": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "shop_name": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "stock": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "sold": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "historical_sold": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "rating_total": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "period_start_time": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "period_end_time": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "price_vnd": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "price_min_vnd": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "price_max_vnd": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "price_before_discount_vnd": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "rating_star": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "shop_rating": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "est_commission_vnd": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "seller_commission_vnd": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "shopee_commission_vnd": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "commission_cap_vnd": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "default_commission_rate_pct": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "seller_commission_rate_pct": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "shopee_commission_rate_pct": {
+        "type": [
+          "number",
+          "null"
+        ]
+      },
+      "is_capped": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "is_free_sample": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "most_used_channel": {
+        "type": [
+          "string",
+          "integer",
+          "null"
+        ]
+      },
+      "product_link": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "schemaVersion": {
+        "type": "string",
+        "const": "1.0"
+      },
+      "fetchedAt": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "cacheHit": {
+        "type": "boolean"
+      },
+      "resultId": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "item_id",
+      "shop_id",
+      "category_id",
+      "name",
+      "image",
+      "discount",
+      "shop_name",
+      "stock",
+      "sold",
+      "historical_sold",
+      "rating_total",
+      "period_start_time",
+      "period_end_time",
+      "price_vnd",
+      "price_min_vnd",
+      "price_max_vnd",
+      "price_before_discount_vnd",
+      "rating_star",
+      "shop_rating",
+      "est_commission_vnd",
+      "seller_commission_vnd",
+      "shopee_commission_vnd",
+      "commission_cap_vnd",
+      "default_commission_rate_pct",
+      "seller_commission_rate_pct",
+      "shopee_commission_rate_pct",
+      "is_capped",
+      "is_free_sample",
+      "most_used_channel",
+      "product_link",
+      "schemaVersion",
+      "fetchedAt",
+      "cacheHit",
+      "resultId"
+    ]
+  },
+  "views": {
+    "overview": {
+      "title": "Products",
+      "transformation": {
+        "fields": [
+          "item_id",
+          "name",
+          "product_link",
+          "price_vnd",
+          "stock",
+          "historical_sold",
+          "rating_star",
+          "shop_name",
+          "default_commission_rate_pct",
+          "seller_commission_rate_pct",
+          "shopee_commission_rate_pct",
+          "est_commission_vnd",
+          "fetchedAt",
+          "cacheHit"
+        ]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "item_id": {
+            "label": "Item id"
+          },
+          "name": {
+            "label": "Name"
+          },
+          "product_link": {
+            "label": "Product link",
+            "format": "link"
+          },
+          "price_vnd": {
+            "label": "Price vnd"
+          },
+          "stock": {
+            "label": "Stock"
+          },
+          "historical_sold": {
+            "label": "Historical sold"
+          },
+          "rating_star": {
+            "label": "Rating star"
+          },
+          "shop_name": {
+            "label": "Shop name"
+          },
+          "default_commission_rate_pct": {
+            "label": "Default commission rate pct"
+          },
+          "seller_commission_rate_pct": {
+            "label": "Seller commission rate pct"
+          },
+          "shopee_commission_rate_pct": {
+            "label": "Shopee commission rate pct"
+          },
+          "est_commission_vnd": {
+            "label": "Est commission vnd"
+          },
+          "fetchedAt": {
+            "label": "Fetchedat"
+          },
+          "cacheHit": {
+            "label": "Cachehit"
+          }
+        }
+      }
+    }
+  }
+}

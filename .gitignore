@@ -9,3 +9,11 @@ htmlcov/
 output/
 # Open API credentials
 .env
+.env.*
+!.env.example
+storage/
+.secrets/
+.ruff_cache/
+.coverage-new
+coverage.xml
+dist/

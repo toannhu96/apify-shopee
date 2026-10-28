@@ -35,10 +35,44 @@ ALLOWED_HEADERS = frozenset({"x-sap-ri", "x-sap-sec", "af-ac-enc-sz-token",
 
 class DirectError(RuntimeError):
     """Safe-to-display error without request secrets or response contents."""
+    category = 'invalid_response'
 
 
 class DirectBlockedError(DirectError):
     """Server rejected authentication or traffic; do not retry automatically."""
+    category = 'verification'
+
+
+class DirectAuthenticationError(DirectBlockedError):
+    category = 'authentication'
+
+
+class DirectVerificationError(DirectBlockedError):
+    category = 'verification'
+
+
+class DirectRateLimitError(DirectBlockedError):
+    category = 'rate_limit'
+
+
+class DirectTransientError(DirectError):
+    category = 'transient'
+
+
+class DirectUnavailableError(DirectError):
+    category = 'unavailable'
+
+
+class DirectInputError(DirectError):
+    category = 'input'
+
+
+class DirectSigningError(DirectError):
+    category = 'signing'
+
+
+class NoApplicableCookiesError(ValueError):
+    """An otherwise valid export contains no usable endpoint cookies."""
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -79,7 +113,7 @@ def cookie_header(source: str) -> str:
         if host_matches and path_matches and (expires == -1 or expires > now):
             applicable.append(cookie)
     if not applicable:
-        raise ValueError("No unexpired cookies apply to the affiliate product endpoint")
+        raise NoApplicableCookiesError("No unexpired cookies apply to the affiliate product endpoint")
     ordered = sorted(applicable, key=lambda cookie: -len(cookie.get("path", "/")))
     return "; ".join(f"{cookie['name']}={cookie['value']}" for cookie in ordered)
 
@@ -131,9 +165,11 @@ def _validate(raw: bytes, item_id: str) -> dict[str, Any]:
         raise DirectError("Unexpected product response structure")
     code = payload.get("error", payload.get("code"))
     if code in (90309999, "90309999"):
-        raise DirectBlockedError("Shopee rejected the request (API 90309999)")
-    if payload.get("is_login") is False or payload.get("redirect_to_error_page") is True:
-        raise DirectBlockedError("Shopee requires login or traffic verification")
+        raise DirectVerificationError("Shopee rejected the request (API 90309999)")
+    if payload.get("is_login") is False:
+        raise DirectAuthenticationError("Shopee requires login or traffic verification")
+    if payload.get("redirect_to_error_page") is True:
+        raise DirectVerificationError("Shopee requires login or traffic verification")
     if "error" in payload or type(code) is not int or code != 0:
         suffix = f" (API {code})" if type(code) is int and abs(code) < 10**10 else ""
         raise DirectError("Shopee API request failed" + suffix)

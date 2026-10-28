@@ -9,11 +9,11 @@ A usable seed and live server acceptance are separate from local algorithm tests
 from __future__ import annotations
 
 import argparse
-from collections.abc import Callable, Mapping
 import json
 import math
-from pathlib import Path
 import sys
+from collections.abc import Callable, Mapping
+from pathlib import Path
 
 from . import direct, http_transport
 
@@ -85,8 +85,10 @@ def _cookie_header(source: str) -> str:
         cookie = direct.cookie_header(source)
         http_transport._request_headers({}, cookie)
         return cookie
+    except direct.NoApplicableCookiesError:
+        raise direct.DirectAuthenticationError('Shopee session has no usable login cookies') from None
     except (ValueError, TypeError, RecursionError):
-        raise direct.DirectError('Cookie input is invalid') from None
+        raise direct.DirectInputError('Cookie input is invalid') from None
 
 
 def _default_signer() -> Signer:
@@ -94,7 +96,7 @@ def _default_signer() -> Signer:
         from .sap_signer import refresh_headers
         return refresh_headers
     except ImportError:
-        raise direct.DirectError('The pure-Python signer is unavailable') from None
+        raise direct.DirectSigningError('The pure-Python signer is unavailable') from None
 
 
 def fetch_product(item_id: str | int, *, seed_headers: Mapping[str, str],
@@ -104,24 +106,59 @@ def fetch_product(item_id: str | int, *, seed_headers: Mapping[str, str],
         identifier = direct._item_id(item_id)
         seed = _normalized_headers(seed_headers)
     except (ValueError, TypeError):
-        raise direct.DirectError('Product ID or signing seed headers are invalid') from None
+        raise direct.DirectInputError('Product ID or signing seed headers are invalid') from None
     cookie = _cookie_header(cookie_source)
     signer = _default_signer() if signer is None else signer
     try:
         generated = _normalized_headers(signer(identifier, seed))
-    except Exception:
-        raise direct.DirectError('Could not generate fresh signing headers') from None
+    except Exception:  # noqa: BLE001 - never expose signer state in exception output
+        raise direct.DirectSigningError('Could not generate fresh signing headers') from None
+    return _fetch_validated(identifier, generated, cookie)
+
+
+def fetch_signed_product(item_id: str | int, *, headers: Mapping[str, str],
+                         cookie_source: str, proxy_url: str | None = None) -> dict:
+    """Send one already-reserved signature, without signing again or retrying.
+
+The managed worker must persist signing state before invoking this function.
+The proxy is operator configuration, never a public Actor input.
+"""
     try:
-        response = http_transport.request_product(identifier, headers=generated, cookie=cookie)
+        identifier = direct._item_id(item_id)
+        generated = _normalized_headers(headers)
+        http_transport.validate_proxy_url(proxy_url)
+    except (ValueError, TypeError):
+        raise direct.DirectInputError('Product ID, reserved headers or proxy are invalid') from None
+    return _fetch_validated(identifier, generated, _cookie_header(cookie_source), proxy_url)
+
+
+def _fetch_validated(identifier: str, generated: Mapping[str, str], cookie: str,
+                     proxy_url: str | None = None) -> dict:
+    options = {} if proxy_url is None else {'proxy_url': proxy_url}
+    try:
+        response = http_transport.request_product(identifier, headers=generated, cookie=cookie, **options)
     except http_transport.TransportError as error:
-        raise direct.DirectError(str(error)) from None
+        error_class = {'transient': direct.DirectTransientError, 'input': direct.DirectInputError}.get(
+            error.category, direct.DirectError)
+        raise error_class(str(error)) from None
     except ValueError:
-        raise direct.DirectError('Generated request inputs are invalid') from None
-    if response.status in (401, 403, 429) or 300 <= response.status < 400:
-        raise direct.DirectBlockedError(f'Request blocked or redirected (HTTP {response.status})')
-    if response.status != 200:
-        raise direct.DirectError(f'Unexpected HTTP status {response.status}')
+        raise direct.DirectInputError('Generated request inputs are invalid') from None
+    _check_status(response.status)
     return direct._validate(response.body, identifier)
+
+
+def _check_status(status: int) -> None:
+    error_class = {401: direct.DirectAuthenticationError, 403: direct.DirectVerificationError,
+                   429: direct.DirectRateLimitError}.get(status)
+    if error_class is not None or 300 <= status < 400:
+        error_class = error_class or direct.DirectVerificationError
+        raise error_class(f'Request blocked or redirected (HTTP {status})')
+    if status in (404, 410):
+        raise direct.DirectUnavailableError(f'Unexpected HTTP status {status}')
+    if status in (408, 425) or status >= 500:
+        raise direct.DirectTransientError(f'Unexpected HTTP status {status}')
+    if status != 200:
+        raise direct.DirectError(f'Unexpected HTTP status {status}')
 
 
 def _read_cookie(path: Path | None) -> str:

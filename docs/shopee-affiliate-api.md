@@ -1,5 +1,14 @@
 # Shopee Affiliate (VN) product offer API
 
+## Managed Apify integration
+
+The public Actor and private backend are documented in
+[Managed Shopee Vietnam Actor](managed-actor.md). The managed worker uses the
+new `session_signer` to persist cumulative request history and calls
+`signed_client.fetch_signed_product` with a reserved signature. The standalone
+client below remains a single-lookup interface. Offline tests and container
+checks do not establish sustained live acceptance or production capacity.
+
 ## Browser-free Python client — verified 2026-10-28
 
 `shopee_affiliate.signed_client` generates fresh signatures in Python and calls the

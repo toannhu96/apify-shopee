@@ -1,0 +1,8 @@
+-r requirements.txt
+-r requirements-actor.txt
+-r requirements-service.txt
+coverage==7.17.0
+pytest-asyncio==1.4.1
+jsonschema==4.26.0
+ruff==0.17.3
+pip-audit==2.10.1

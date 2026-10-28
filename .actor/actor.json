@@ -1,0 +1,18 @@
+{
+  "actorSpecification": 1,
+  "name": "shopee-vietnam-product-details",
+  "title": "Shopee Vietnam Product Details and Affiliate Commissions",
+  "description": "Fetch affiliate-accessible Shopee Vietnam products by ID or full product URL, with prices, sales, ratings and managed-account commission observations.",
+  "version": "0.1",
+  "buildTag": "beta",
+  "dockerfile": "./Dockerfile",
+  "dockerContextDir": "..",
+  "readme": "./README.md",
+  "input": "./input_schema.json",
+  "output": "./output_schema.json",
+  "storages": {"dataset": "./dataset_schema.json"},
+  "minMemoryMbytes": 256,
+  "defaultMemoryMbytes": 512,
+  "maxMemoryMbytes": 1024,
+  "usesStandbyMode": false
+}

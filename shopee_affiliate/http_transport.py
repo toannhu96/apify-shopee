@@ -13,6 +13,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from importlib import import_module
 from io import BytesIO
+from urllib.parse import unquote, urlsplit
 
 ENDPOINT = 'https://affiliate.shopee.vn/api/v3/offer/product'
 PRODUCT_ID = r'[1-9][0-9]{0,19}'
@@ -31,6 +32,10 @@ ALLOWED_HEADERS = frozenset({
 
 class TransportError(RuntimeError):
     """Safe-to-display transport error without headers, cookies or response data."""
+
+    def __init__(self, message: str, *, category: str = 'transient') -> None:
+        super().__init__(message)
+        self.category = category
 
 
 @dataclass(frozen=True)
@@ -78,10 +83,30 @@ def _load_requests():
     try:
         return import_module('curl_cffi.requests')
     except (ImportError, OSError):
-        raise TransportError('curl_cffi is required for direct HTTPS requests') from None
+        raise TransportError('curl_cffi is required for direct HTTPS requests', category='input') from None
 
 
-def request_product(target: str | int, *, headers: Mapping[str, str], cookie: str) -> HttpResponse:
+def validate_proxy_url(proxy_url: str | None) -> str | None:
+    """Validate a trusted operator's explicit proxy without exposing credentials."""
+    if proxy_url is None:
+        return None
+    try:
+        if not isinstance(proxy_url, str) or not 1 <= len(proxy_url) <= 4096:
+            raise ValueError
+        if any(not 33 <= ord(char) <= 126 for char in proxy_url + unquote(proxy_url)):
+            raise ValueError
+        parsed = urlsplit(proxy_url)
+        if (parsed.scheme not in ('http', 'https', 'socks5', 'socks5h') or not parsed.hostname
+                or parsed.path not in ('', '/') or parsed.query or parsed.fragment
+                or parsed.port is not None and not 1 <= parsed.port <= 65535):
+            raise ValueError
+        return proxy_url
+    except (ValueError, TypeError):
+        raise ValueError('Invalid operator proxy URL') from None
+
+
+def request_product(target: str | int, *, headers: Mapping[str, str], cookie: str,
+                    proxy_url: str | None = None) -> HttpResponse:
     """Send one GET and return status plus at most eight MiB of response bytes.
 
     Non-200 statuses are returned for the caller to classify. Automatic headers,
@@ -90,32 +115,35 @@ def request_product(target: str | int, *, headers: Mapping[str, str], cookie: st
     """
     url = product_url(target)
     request_headers = _request_headers(headers, cookie)
+    proxy = validate_proxy_url(proxy_url)
     requests = _load_requests()
     buffer, size, too_large = BytesIO(), 0, False
 
     def collect(chunk: bytes) -> int:
         nonlocal size, too_large
         if not isinstance(chunk, bytes):
-            raise TransportError('Invalid response chunk')
+            raise TransportError('Invalid response chunk', category='invalid_response')
         if size + len(chunk) > MAX_RESPONSE_BYTES:
             too_large = True
-            raise TransportError('Response exceeds the size limit')
+            raise TransportError('Response exceeds the size limit', category='invalid_response')
         buffer.write(chunk)
         size += len(chunk)
         return len(chunk)
 
     try:
         with requests.Session(trust_env=False) as session:
+            proxy_options = {} if proxy is None else {'proxy': proxy}
             response = session.get(url, headers=request_headers, impersonate=CHROME_PROFILE,
                 default_headers=False, timeout=20, allow_redirects=False, verify=True,
-                content_callback=collect)
+                content_callback=collect, **proxy_options)
         if too_large:
-            raise TransportError('Response exceeds the size limit')
+            raise TransportError('Response exceeds the size limit', category='invalid_response')
         if type(response.status_code) is not int or not 100 <= response.status_code <= 599:
-            raise TransportError('Invalid HTTP status')
+            raise TransportError('Invalid HTTP status', category='invalid_response')
         return HttpResponse(response.status_code, buffer.getvalue())
-    except Exception:
+    except Exception as error:  # noqa: BLE001 - transport exceptions may contain credentials
         message = 'Response exceeds the size limit' if too_large else 'Direct HTTPS request failed'
-        raise TransportError(message) from None
+        category = 'invalid_response' if too_large else getattr(error, 'category', 'transient')
+        raise TransportError(message, category=category) from None
     finally:
         buffer.close()
