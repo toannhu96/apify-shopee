@@ -1,0 +1,17 @@
+{
+  "synthetic": true,
+  "cases": [
+    {
+      "key": "a9a95587dc957912",
+      "block": "f7a431c754eefac5832253fd3f9c4a7c69ea247c6b823f1b9a094678ecbb",
+      "padding": "e35aca79d68e8ed69c2c53fd3f9c4a7c69ea247ca8942092b78a79689f60",
+      "values": "b717460933a013ff302e5e0d6440887b83d72a8b"
+    },
+    {
+      "key": "0102030405060708",
+      "block": "d6288879d68e8ed69c2cb413430f34a812fd332a5b0b6348897980",
+      "padding": "e35aca79d68e8ed69c2c53fd3f9c4a7c69ea247ca8942092b78a79",
+      "values": "b717460933a013ff302e5e0d6440887b83d72a8b"
+    }
+  ]
+}

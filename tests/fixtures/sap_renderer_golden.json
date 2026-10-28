@@ -1,0 +1,360 @@
+{
+  "synthetic": true,
+  "source_sha256": "8279065013fbb6b7b5f8c3f48a9f6efb7b1ddb346ddf59b7abc85572eb280094",
+  "renderer": "Synthetic Renderer",
+  "ri": "00d2496b6d4cd3b1c326463b05018e3db7e8798097a81e4641a3",
+  "vectors": [
+    {
+      "kind": "string",
+      "hex": "3335356339373365"
+    },
+    {
+      "kind": "bytes",
+      "hex": "a9a95587dc957912"
+    },
+    {
+      "kind": "bytes",
+      "hex": "f7a431c754eefac5832253fd3f9c4a7c69ea247c6b823f1b9a094678ecbb"
+    },
+    {
+      "kind": "string",
+      "hex": ""
+    },
+    {
+      "kind": "bytes",
+      "hex": "a9f9099f7f947912"
+    },
+    {
+      "kind": "string",
+      "hex": "9c9030beedac48219c9066e5e9a54e2a9cca37b3b8a048239fcc63b7baa44c269bcb31b1e9a51a24cc9863e6efa04a209fcf66b2b8f74e23"
+    },
+    {
+      "kind": "string",
+      "hex": "9a9e6dbeb9ad4d25849e67b4bab84d2bcd9c78e5e4ad4a3f9bca67b6efa31d71ca9b63b5"
+    },
+    {
+      "kind": "string",
+      "hex": "c8cf33eeb0fc1866cc8726efb3e51c7787df3b"
+    },
+    {
+      "kind": "string",
+      "hex": "fad03bf3b4f00d7bca8907e2b2f11c60ccdb"
+    },
+    {
+      "kind": "string",
+      "hex": ""
+    },
+    {
+      "kind": "string",
+      "hex": ""
+    },
+    {
+      "kind": "bytes",
+      "hex": "4bcaa885"
+    },
+    {
+      "kind": "bytes",
+      "hex": "86924d9924f154c68ee81d737b23726242273da6fde8b4df17a3d7a884cccfe1e78b473ebd363b8c1b3d16e97070adc0ca5ae99b7d3baed081b5d275637144c6f8c3af06e44a9a76b10036595bbaf8db954f7a594d69706a976fe1676d5afb06826b6cd06ce66fa3c92173ce90d4806ddaa48114847db9be4c66c3052dd86b5cf88bf9e9d8a684347f4cc943aaec5050cb4a55164e742396ccd0b324f0"
+    },
+    {
+      "kind": "bytes",
+      "hex": "f3380d90"
+    },
+    {
+      "kind": "bytes",
+      "hex": "3d5810b18a36d00e"
+    },
+    {
+      "kind": "bytes",
+      "hex": "609b3762f60dd4c9e10016ab46e5d25523ed01ee8083189e1d319d8bb77b7bb6ecd2e44528b3dbc1449c771b97c08c0b4fca9b478d32afd667379ce23103a39f4a8d64082350f19c456baf7510e433479c5a9b1acc8dd6af4f52c700e336dedcef6fa41802bb7e8a5b"
+    }
+  ],
+  "fields": [
+    {
+      "index": 4,
+      "kind": "uint16",
+      "value": 47076
+    },
+    {
+      "index": 29,
+      "kind": "int32",
+      "value": -597327594
+    },
+    {
+      "index": 15,
+      "kind": "int32",
+      "value": -958170448
+    },
+    {
+      "index": 10,
+      "kind": "uint16",
+      "value": 38711
+    },
+    {
+      "index": 21,
+      "kind": "uint8",
+      "value": 198
+    },
+    {
+      "index": 47,
+      "kind": "offset",
+      "value": 11
+    },
+    {
+      "index": 14,
+      "kind": "offset",
+      "value": 0
+    },
+    {
+      "index": 45,
+      "kind": "uint8",
+      "value": 172
+    },
+    {
+      "index": 56,
+      "kind": "uint8",
+      "value": 187
+    },
+    {
+      "index": 19,
+      "kind": "offset",
+      "value": 2
+    },
+    {
+      "index": 8,
+      "kind": "uint8",
+      "value": 191
+    },
+    {
+      "index": 28,
+      "kind": "uint16",
+      "value": 34089
+    },
+    {
+      "index": 53,
+      "kind": "uint16",
+      "value": 42412
+    },
+    {
+      "index": 22,
+      "kind": "uint8",
+      "value": 52
+    },
+    {
+      "index": 26,
+      "kind": "uint8",
+      "value": 10
+    },
+    {
+      "index": 55,
+      "kind": "uint8",
+      "value": 102
+    },
+    {
+      "index": 13,
+      "kind": "uint16",
+      "value": 61984
+    },
+    {
+      "index": 0,
+      "kind": "offset",
+      "value": 12
+    },
+    {
+      "index": 9,
+      "kind": "uint8",
+      "value": 91
+    },
+    {
+      "index": 32,
+      "kind": "uint8",
+      "value": 174
+    },
+    {
+      "index": 17,
+      "kind": "offset",
+      "value": 14
+    },
+    {
+      "index": 39,
+      "kind": "uint8",
+      "value": 158
+    },
+    {
+      "index": 34,
+      "kind": "uint8",
+      "value": 47
+    },
+    {
+      "index": 52,
+      "kind": "uint8",
+      "value": 170
+    },
+    {
+      "index": 18,
+      "kind": "uint8",
+      "value": 59
+    },
+    {
+      "index": 3,
+      "kind": "uint8",
+      "value": 180
+    },
+    {
+      "index": 50,
+      "kind": "int32",
+      "value": -1558408727
+    },
+    {
+      "index": 7,
+      "kind": "uint16",
+      "value": 51472
+    },
+    {
+      "index": 20,
+      "kind": "offset",
+      "value": 1
+    },
+    {
+      "index": 25,
+      "kind": "offset",
+      "value": 13
+    },
+    {
+      "index": 31,
+      "kind": "uint8",
+      "value": 41
+    },
+    {
+      "index": 35,
+      "kind": "int32",
+      "value": 923437980
+    },
+    {
+      "index": 38,
+      "kind": "offset",
+      "value": 3
+    },
+    {
+      "index": 2,
+      "kind": "offset",
+      "value": 5
+    },
+    {
+      "index": 43,
+      "kind": "offset",
+      "value": 15
+    },
+    {
+      "index": 27,
+      "kind": "uint8",
+      "value": 42
+    },
+    {
+      "index": 33,
+      "kind": "uint8",
+      "value": 231
+    },
+    {
+      "index": 44,
+      "kind": "uint8",
+      "value": 39
+    },
+    {
+      "index": 6,
+      "kind": "offset",
+      "value": 8
+    },
+    {
+      "index": 37,
+      "kind": "uint16",
+      "value": 46729
+    },
+    {
+      "index": 12,
+      "kind": "float32",
+      "value": 1.0
+    },
+    {
+      "index": 49,
+      "kind": "uint8",
+      "value": 18
+    },
+    {
+      "index": 40,
+      "kind": "uint8",
+      "value": 101
+    },
+    {
+      "index": 51,
+      "kind": "offset",
+      "value": 9
+    },
+    {
+      "index": 36,
+      "kind": "uint16",
+      "value": 22629
+    },
+    {
+      "index": 48,
+      "kind": "int32",
+      "value": -2074559871
+    },
+    {
+      "index": 54,
+      "kind": "offset",
+      "value": 4
+    },
+    {
+      "index": 1,
+      "kind": "offset",
+      "value": 10
+    },
+    {
+      "index": 16,
+      "kind": "uint16",
+      "value": 4498
+    },
+    {
+      "index": 30,
+      "kind": "uint16",
+      "value": 64131
+    },
+    {
+      "index": 23,
+      "kind": "uint8",
+      "value": 91
+    },
+    {
+      "index": 24,
+      "kind": "offset",
+      "value": 6
+    },
+    {
+      "index": 46,
+      "kind": "int32",
+      "value": -114452102
+    },
+    {
+      "index": 11,
+      "kind": "uint8",
+      "value": 140
+    },
+    {
+      "index": 42,
+      "kind": "int32",
+      "value": 143903784
+    },
+    {
+      "index": 41,
+      "kind": "uint8",
+      "value": 0
+    },
+    {
+      "index": 5,
+      "kind": "offset",
+      "value": 7
+    }
+  ],
+  "payload_hex": "7c00000000007600ac007c0020004c006f00aa000400400066008b007b009e000f00380080009400a0001e00740070008c0060009d0085001b0014005c00840047008800a4001c005b007a004600720054002e003e005000730036000000080048004500930010009800280037006800300071008600240083009200760000000802000028cc93080000008c7a992df9100200000000005b83fa9211bc0100006c02000081ba588400006558b4010000000065120000803f000089b6ac0100000027e72a64000000040200004c0200009c8b0a3700000029cc00000068020000000010c9e9911ca3000000b43baa2f9ea80000000000ae5bb400000020f200660a34aca5298500bf180200000000bbac400200003c01000000c63797b07ae3c6168165dc0000e4b769000000609b3762f60dd4c9e10016ab46e5d25523ed01ee8083189e1d319d8bb77b7bb6ecd2e44528b3dbc1449c771b97c08c0b4fca9b478d32afd667379ce23103a39f4a8d64082350f19c456baf7510e433479c5a9b1acc8dd6af4f52c700e336dedcef6fa41802bb7e8a5b000000080000003d5810b18a36d00e04000000f3380d909d00000086924d9924f154c68ee81d737b23726242273da6fde8b4df17a3d7a884cccfe1e78b473ebd363b8c1b3d16e97070adc0ca5ae99b7d3baed081b5d275637144c6f8c3af06e44a9a76b10036595bbaf8db954f7a594d69706a976fe1676d5afb06826b6cd06ce66fa3c92173ce90d4806ddaa48114847db9be4c66c3052dd86b5cf88bf9e9d8a684347f4cc943aaec5050cb4a55164e742396ccd0b324f0000000040000004bcaa8850000000000000000000000000000000012000000fad03bf3b4f00d7bca8907e2b2f11c60ccdb0000000000000000000013000000c8cf33eeb0fc1866cc8726efb3e51c7787df3b00240000009a9e6dbeb9ad4d25849e67b4bab84d2bcd9c78e5e4ad4a3f9bca67b6efa31d71ca9b63b500000000380000009c9030beedac48219c9066e5e9a54e2a9cca37b3b8a048239fcc63b7baa44c269bcb31b1e9a51a24cc9863e6efa04a209fcf66b2b8f74e230000000008000000a9f9099f7f94791200000000000000001e000000f7a431c754eefac5832253fd3f9c4a7c69ea247c6b823f1b9a094678ecbb000008000000a9a95587dc95791208000000333535633937336500000000"
+}

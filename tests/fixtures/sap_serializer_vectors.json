@@ -1,0 +1,404 @@
+{
+  "source_sha256": "8279065013fbb6b7b5f8c3f48a9f6efb7b1ddb346ddf59b7abc85572eb280094",
+  "synthetic": true,
+  "cases": [
+    {
+      "name": "empty_root",
+      "vectors": [],
+      "fields": [],
+      "expected_payload_hex": "080000000400040004000000"
+    },
+    {
+      "name": "explicit_zero_tail",
+      "vectors": [],
+      "fields": [
+        {
+          "index": 56,
+          "kind": "uint8",
+          "value": 0
+        }
+      ],
+      "expected_payload_hex": "080000000400040004000000"
+    },
+    {
+      "name": "signed_limits",
+      "vectors": [],
+      "fields": [
+        {
+          "index": 56,
+          "kind": "int32",
+          "value": -2147483648
+        },
+        {
+          "index": 0,
+          "kind": "int32",
+          "value": 2147483647
+        },
+        {
+          "index": 2,
+          "kind": "uint8",
+          "value": 255
+        },
+        {
+          "index": 3,
+          "kind": "uint16",
+          "value": 65535
+        }
+      ],
+      "expected_payload_hex": "7c000000000076001000080000000700040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c0076000000ffff00ffffffff7f00000080"
+    },
+    {
+      "name": "float_precision",
+      "vectors": [],
+      "fields": [
+        {
+          "index": 15,
+          "kind": "float32",
+          "value": 0.1
+        },
+        {
+          "index": 56,
+          "kind": "float32",
+          "value": -1.125
+        }
+      ],
+      "expected_payload_hex": "7c000000000076000c0000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040076000000000090bfcdcccc3d"
+    },
+    {
+      "name": "empty_strings_vectors",
+      "vectors": [
+        {
+          "kind": "string",
+          "hex": ""
+        },
+        {
+          "kind": "bytes",
+          "hex": ""
+        }
+      ],
+      "fields": [
+        {
+          "index": 0,
+          "kind": "offset",
+          "value": 0
+        },
+        {
+          "index": 56,
+          "kind": "offset",
+          "value": 1
+        }
+      ],
+      "expected_payload_hex": "7c000000000076000c00080000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400760000000800000008000000000000000000000000000000"
+    },
+    {
+      "name": "utf8_alignment",
+      "vectors": [
+        {
+          "kind": "string",
+          "hex": "5669e1bb8774204e616d20f09f8eaf"
+        },
+        {
+          "kind": "bytes",
+          "hex": "010203"
+        },
+        {
+          "kind": "string",
+          "hex": "6162636465"
+        }
+      ],
+      "fields": [
+        {
+          "index": 54,
+          "kind": "offset",
+          "value": 0
+        },
+        {
+          "index": 15,
+          "kind": "uint8",
+          "value": 1
+        },
+        {
+          "index": 5,
+          "kind": "offset",
+          "value": 1
+        },
+        {
+          "index": 12,
+          "kind": "offset",
+          "value": 2
+        }
+      ],
+      "expected_payload_hex": "780000000000720014000000000000000000000008000000000000000000000000000400000000000f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000720000001000000018000000000000011800000005000000616263646500000003000000010203000f0000005669e1bb8774204e616d20f09f8eaf00"
+    },
+    {
+      "name": "padding_1",
+      "vectors": [
+        {
+          "kind": "bytes",
+          "hex": "2d"
+        }
+      ],
+      "fields": [
+        {
+          "index": 2,
+          "kind": "uint16",
+          "value": 13
+        },
+        {
+          "index": 3,
+          "kind": "offset",
+          "value": 0
+        },
+        {
+          "index": 4,
+          "kind": "uint8",
+          "value": 4
+        }
+      ],
+      "expected_payload_hex": "1400000000000e001000000000000e00080007000e000000000000040800000000000d00010000002d000000"
+    },
+    {
+      "name": "padding_2",
+      "vectors": [
+        {
+          "kind": "bytes",
+          "hex": "2d2d"
+        }
+      ],
+      "fields": [
+        {
+          "index": 2,
+          "kind": "uint16",
+          "value": 13
+        },
+        {
+          "index": 3,
+          "kind": "offset",
+          "value": 0
+        },
+        {
+          "index": 4,
+          "kind": "uint8",
+          "value": 4
+        }
+      ],
+      "expected_payload_hex": "1400000000000e001000000000000e00080007000e000000000000040800000000000d00020000002d2d0000"
+    },
+    {
+      "name": "padding_3",
+      "vectors": [
+        {
+          "kind": "bytes",
+          "hex": "2d2d2d"
+        }
+      ],
+      "fields": [
+        {
+          "index": 2,
+          "kind": "uint16",
+          "value": 13
+        },
+        {
+          "index": 3,
+          "kind": "offset",
+          "value": 0
+        },
+        {
+          "index": 4,
+          "kind": "uint8",
+          "value": 4
+        }
+      ],
+      "expected_payload_hex": "1400000000000e001000000000000e00080007000e000000000000040800000000000d00030000002d2d2d00"
+    },
+    {
+      "name": "padding_4",
+      "vectors": [
+        {
+          "kind": "bytes",
+          "hex": "2d2d2d2d"
+        }
+      ],
+      "fields": [
+        {
+          "index": 2,
+          "kind": "uint16",
+          "value": 13
+        },
+        {
+          "index": 3,
+          "kind": "offset",
+          "value": 0
+        },
+        {
+          "index": 4,
+          "kind": "uint8",
+          "value": 4
+        }
+      ],
+      "expected_payload_hex": "1400000000000e001000000000000e00080007000e000000000000040800000000000d00040000002d2d2d2d"
+    },
+    {
+      "name": "padding_5",
+      "vectors": [
+        {
+          "kind": "bytes",
+          "hex": "2d2d2d2d2d"
+        }
+      ],
+      "fields": [
+        {
+          "index": 2,
+          "kind": "uint16",
+          "value": 13
+        },
+        {
+          "index": 3,
+          "kind": "offset",
+          "value": 0
+        },
+        {
+          "index": 4,
+          "kind": "uint8",
+          "value": 4
+        }
+      ],
+      "expected_payload_hex": "1400000000000e001000000000000e00080007000e000000000000040800000000000d00050000002d2d2d2d2d000000"
+    },
+    {
+      "name": "padding_7",
+      "vectors": [
+        {
+          "kind": "bytes",
+          "hex": "2d2d2d2d2d2d2d"
+        }
+      ],
+      "fields": [
+        {
+          "index": 2,
+          "kind": "uint16",
+          "value": 13
+        },
+        {
+          "index": 3,
+          "kind": "offset",
+          "value": 0
+        },
+        {
+          "index": 4,
+          "kind": "uint8",
+          "value": 4
+        }
+      ],
+      "expected_payload_hex": "1400000000000e001000000000000e00080007000e000000000000040800000000000d00070000002d2d2d2d2d2d2d00"
+    },
+    {
+      "name": "padding_8",
+      "vectors": [
+        {
+          "kind": "bytes",
+          "hex": "2d2d2d2d2d2d2d2d"
+        }
+      ],
+      "fields": [
+        {
+          "index": 2,
+          "kind": "uint16",
+          "value": 13
+        },
+        {
+          "index": 3,
+          "kind": "offset",
+          "value": 0
+        },
+        {
+          "index": 4,
+          "kind": "uint8",
+          "value": 4
+        }
+      ],
+      "expected_payload_hex": "1400000000000e001000000000000e00080007000e000000000000040800000000000d00080000002d2d2d2d2d2d2d2d"
+    },
+    {
+      "name": "padding_15",
+      "vectors": [
+        {
+          "kind": "bytes",
+          "hex": "2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d"
+        }
+      ],
+      "fields": [
+        {
+          "index": 2,
+          "kind": "uint16",
+          "value": 13
+        },
+        {
+          "index": 3,
+          "kind": "offset",
+          "value": 0
+        },
+        {
+          "index": 4,
+          "kind": "uint8",
+          "value": 4
+        }
+      ],
+      "expected_payload_hex": "1400000000000e001000000000000e00080007000e000000000000040800000000000d000f0000002d2d2d2d2d2d2d2d2d2d2d2d2d2d2d00"
+    },
+    {
+      "name": "padding_16",
+      "vectors": [
+        {
+          "kind": "bytes",
+          "hex": "2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d"
+        }
+      ],
+      "fields": [
+        {
+          "index": 2,
+          "kind": "uint16",
+          "value": 13
+        },
+        {
+          "index": 3,
+          "kind": "offset",
+          "value": 0
+        },
+        {
+          "index": 4,
+          "kind": "uint8",
+          "value": 4
+        }
+      ],
+      "expected_payload_hex": "1400000000000e001000000000000e00080007000e000000000000040800000000000d00100000002d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d"
+    },
+    {
+      "name": "padding_17",
+      "vectors": [
+        {
+          "kind": "bytes",
+          "hex": "2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d"
+        }
+      ],
+      "fields": [
+        {
+          "index": 2,
+          "kind": "uint16",
+          "value": 13
+        },
+        {
+          "index": 3,
+          "kind": "offset",
+          "value": 0
+        },
+        {
+          "index": 4,
+          "kind": "uint8",
+          "value": 4
+        }
+      ],
+      "expected_payload_hex": "1400000000000e001000000000000e00080007000e000000000000040800000000000d00110000002d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d000000"
+    }
+  ]
+}

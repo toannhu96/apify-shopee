@@ -1,0 +1,18 @@
+{
+  "source": "Instrumented originalSDK synthetic call; no real browser/accountdata",
+  "sdk_sha256": "8279065013fbb6b7b5f8c3f48a9f6efb7b1ddb346ddf59b7abc85572eb280094",
+  "raw_url": "/api/v3/offer/product?item_id=26609048170",
+  "timestamp_seconds": 1793167195,
+  "random_four_hex": "98123b5e",
+  "request_key_hex": "c3989d12da3b345e",
+  "random_eight_hex": "6d2f058240bfc1fd",
+  "url_digest_hex": "66613339636666",
+  "timestamp_ms": 1793167195745,
+  "timestamp_encoded_hex": "a2668a937b3a345e",
+  "host": "affiliate.shopee.vn",
+  "host_encoded_hex": "a2fefb7bb652552aa6b6ee7ab54b513bedeef3",
+  "rotation_sample": {
+    "ri": "cf8fe16a70291ad56563e13d05013a1a18844420aec0dcb627e2",
+    "rotation": 39
+  }
+}

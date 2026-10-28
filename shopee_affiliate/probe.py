@@ -15,6 +15,7 @@ import argparse
 import json
 import logging
 import random
+import re
 import sys
 import time
 from collections.abc import Callable
@@ -24,9 +25,14 @@ from typing import Any
 from urllib.parse import parse_qs, urlencode, urlparse
 
 from playwright.sync_api import BrowserContext, Page, Response, sync_playwright
-from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import Error as PlaywrightError
 
-from shopee_affiliate.parse import BlockedError, check_api_payload, normalize_detail, normalize_list_item
+from shopee_affiliate.parse import (
+    BlockedError,
+    check_api_payload,
+    normalize_detail,
+    normalize_list_item,
+)
 
 log = logging.getLogger("shopee_affiliate.probe")
 
@@ -58,8 +64,28 @@ IN_PAGE_XHR = """
 
 
 def raise_if_blocked(page: Page) -> None:
-    if any(marker in page.url for marker in BLOCK_MARKERS):
-        raise BlockedError(f"Session blocked or logged out: {page.url}")
+    path = urlparse(page.url).path
+    if any(marker in path for marker in BLOCK_MARKERS[:2]):
+        raise BlockedError("Shopee requires traffic verification; finish it manually before retrying")
+    if "/buyer/login" in path:
+        raise BlockedError("Shopee login is required")
+
+
+def validate_item_id(value: str) -> str:
+    """Require a canonical positive ASCII ID before using it in a URL or filename."""
+    if not isinstance(value, str) or re.fullmatch(r"[1-9][0-9]*", value) is None:
+        raise ValueError("Product ID must be a positive ASCII decimal ID without leading zeros")
+    return value
+
+
+def is_affiliate_response(response: Response, path: str) -> bool:
+    parsed = urlparse(response.url)
+    return (
+        parsed.scheme == "https"
+        and parsed.netloc == "affiliate.shopee.vn"
+        and parsed.path == path
+        and response.request.method == "GET"
+    )
 
 
 def polite_sleep(delay_min: float, delay_max: float) -> None:
@@ -68,12 +94,39 @@ def polite_sleep(delay_min: float, delay_max: float) -> None:
     time.sleep(seconds)
 
 
-def wait_out_login(page: Page) -> None:
+def wait_out_login(page: Page, deadline: float | None = None) -> None:
     """If the app bounced to the login page, let the user log in by hand, then continue."""
-    if "/buyer/login" not in page.url:
+    if "/buyer/login" not in urlparse(page.url).path:
         return
     log.warning("Not logged in. Log in to Shopee Affiliate in the opened browser window (waiting up to 10 min).")
-    page.wait_for_url(f"{BASE}/**", timeout=LOGIN_TIMEOUT_MS)
+    deadline = deadline if deadline is not None else time.monotonic() + LOGIN_TIMEOUT_MS / 1000
+    while time.monotonic() < deadline:
+        parsed = urlparse(page.url)
+        if any(marker in parsed.path for marker in BLOCK_MARKERS[:2]):
+            raise_if_blocked(page)
+        if parsed.scheme == "https" and parsed.netloc == "affiliate.shopee.vn" and "/buyer/login" not in parsed.path:
+            return
+        page.wait_for_timeout(POLL_MS)
+    raise BlockedError("Shopee login did not complete within the allowed time")
+
+
+def read_response(response: Response) -> dict[str, Any] | None:
+    """None means an auth failure whose delayed login redirect may still arrive."""
+    if response.status == 429:
+        raise BlockedError("HTTP 429: Shopee rate limit reached; stop and wait before retrying")
+    if response.status not in (200, 401, 403):
+        raise ValueError(f"HTTP {response.status} from the product API")
+    try:
+        payload = response.json()
+    except (ValueError, PlaywrightError) as exc:
+        raise ValueError("Product API returned an unreadable JSON response") from exc
+    if not isinstance(payload, dict):
+        raise ValueError("Product API response must be a JSON object")  # noqa: TRY004 - invalid remote payload
+    if payload.get("redirect_to_error_page") is True:
+        raise BlockedError("Shopee requires traffic verification; stop before retrying")
+    if response.status in (401, 403) or payload.get("is_login") is False:
+        return None
+    return payload
 
 
 def load_and_capture(page: Page, url: str, matches: Callable[[Response], bool]) -> dict[str, Any] | None:
@@ -84,21 +137,31 @@ def load_and_capture(page: Page, url: str, matches: Callable[[Response], bool]) 
     captured: list[Response] = []
 
     def on_response(response: Response) -> None:
-        if not captured and matches(response):
+        if matches(response):
             captured.append(response)
 
     page.on("response", on_response)
     try:
         page.goto(url, wait_until="domcontentloaded")
         deadline = time.monotonic() + RESPONSE_TIMEOUT_MS / 1000
-        while not captured and time.monotonic() < deadline:
-            if "/buyer/login" in page.url:
-                wait_out_login(page)
+        login_deadline = None
+        pending_auth = False
+        while time.monotonic() < deadline:
+            if "/buyer/login" in urlparse(page.url).path:
+                login_deadline = login_deadline or time.monotonic() + LOGIN_TIMEOUT_MS / 1000
+                wait_out_login(page, login_deadline)
                 deadline = time.monotonic() + RESPONSE_TIMEOUT_MS / 1000
             raise_if_blocked(page)
+            while captured:
+                payload = read_response(captured.pop(0))
+                if payload is not None:
+                    return payload
+                pending_auth = True
             page.wait_for_timeout(POLL_MS)
         raise_if_blocked(page)
-        return captured[0].json() if captured else None
+        if pending_auth:
+            raise BlockedError("Shopee rejected authentication (401/403); log in before retrying")
+        return None
     finally:
         page.remove_listener("response", on_response)
 
@@ -114,7 +177,7 @@ def in_page_get(page: Page, path: str, params: dict[str, Any]) -> dict[str, Any]
 
 
 def run_list(page: Page, args: argparse.Namespace, out_dir: Path) -> list[dict[str, Any]]:
-    first = load_and_capture(page, LIST_PAGE_URL, lambda r: urlparse(r.url).path == LIST_API_PATH)
+    first = load_and_capture(page, LIST_PAGE_URL, lambda r: is_affiliate_response(r, LIST_API_PATH))
     if first is None:
         log.warning("Page did not make its own list call in time; will fetch page 0 in-page instead")
     is_default_query = (
@@ -158,15 +221,29 @@ def list_params(args: argparse.Namespace, offset: int) -> dict[str, Any]:
 
 def fetch_detail_passively(page: Page, item_id: str) -> dict[str, Any]:
     """Open the detail page once and read only the page's own /offer/product response."""
+    item_id = validate_item_id(item_id)
 
     def is_detail(response: Response) -> bool:
         parsed = urlparse(response.url)
-        return parsed.path == DETAIL_API_PATH and parse_qs(parsed.query).get("item_id") == [item_id]
+        return is_affiliate_response(response, DETAIL_API_PATH) and parse_qs(parsed.query).get("item_id") == [item_id]
 
     payload = load_and_capture(page, f"{BASE}/offer/product_offer/{item_id}", is_detail)
     if payload is None:
         raise ValueError(f"Detail page for item {item_id} made no /offer/product call within the timeout")
+    validate_detail_payload(payload, item_id)
     return payload
+
+
+def validate_detail_payload(payload: dict[str, Any], item_id: str) -> None:
+    """Reject empty or unrelated products before reporting a successful lookup."""
+    data = check_api_payload(payload)
+    if not isinstance(data, dict) or str(data.get("item_id")) != item_id:
+        raise ValueError(f"Product API returned missing or mismatched item ID for {item_id}")
+    card = data.get("batch_item_for_item_card_full")
+    if not isinstance(card, dict) or not card:
+        raise ValueError(f"Product API returned no product card for item {item_id}")
+    if card.get("itemid") is not None and str(card["itemid"]) != item_id:
+        raise ValueError(f"Product card item ID does not match requested item {item_id}")
 
 
 def run_detail(page: Page, args: argparse.Namespace, out_dir: Path) -> list[dict[str, Any]]:
@@ -228,7 +305,7 @@ def build_parser() -> argparse.ArgumentParser:
     list_cmd.add_argument("--match-id", help="ID for --match-type")
 
     detail_cmd = sub.add_parser("detail", help="Read product detail from each item's own page load")
-    detail_cmd.add_argument("--item-id", action="append", required=True, help="Repeat for several items")
+    detail_cmd.add_argument("--item-id", type=validate_item_id, action="append", required=True, help="Repeat for several items")
     return parser
 
 
@@ -239,25 +316,24 @@ def main(argv: list[str] | None = None) -> int:
         log.error("--delay-max must be >= --delay-min >= 0")
         return 2
 
-    out_dir = Path(args.out) / datetime.now().strftime("run-%Y%m%d-%H%M%S")
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    with sync_playwright() as playwright:
-        context = open_context(playwright, args)
-        page = context.pages[0] if context.pages else context.new_page()
-        try:
-            runner = run_list if args.command == "list" else run_detail
-            rows = runner(page, args, out_dir)
-        except BlockedError as exc:
-            log.error("%s. Stop, solve any check by hand in a normal browser, and wait before retrying.", exc)
-            return 3
-        except (ValueError, PlaywrightTimeoutError) as exc:
-            log.error("Request failed: %s", exc)
-            return 1
-        finally:
-            context.close()
-
-    write_json(out_dir / "rows.json", rows)
+    try:
+        out_dir = Path(args.out) / datetime.now().strftime("run-%Y%m%d-%H%M%S")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        with sync_playwright() as playwright:
+            context = open_context(playwright, args)
+            try:
+                page = context.pages[0] if context.pages else context.new_page()
+                runner = run_list if args.command == "list" else run_detail
+                rows = runner(page, args, out_dir)
+            finally:
+                context.close()
+        write_json(out_dir / "rows.json", rows)
+    except BlockedError as exc:
+        log.error("%s. Stop, solve any check by hand in a normal browser, and wait before retrying.", exc)
+        return 3
+    except (ValueError, PlaywrightError, OSError) as exc:
+        log.error("Request failed: %s", exc)
+        return 1
     log_summary(rows)
     log.info("Saved %d rows and raw responses to %s", len(rows), out_dir)
     return 0

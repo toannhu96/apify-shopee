@@ -1,0 +1,362 @@
+{
+  "source_sha256": "8279065013fbb6b7b5f8c3f48a9f6efb7b1ddb346ddf59b7abc85572eb280094",
+  "synthetic": true,
+  "vectors": [
+    {
+      "kind": "string",
+      "hex": "3463666339336561"
+    },
+    {
+      "kind": "bytes",
+      "hex": "31a8b6395bba6903"
+    },
+    {
+      "kind": "bytes",
+      "hex": "0fe30575c20d7e45389b162aa48a475d3cccf6b12039be29ba56b6"
+    },
+    {
+      "kind": "string",
+      "hex": ""
+    },
+    {
+      "kind": "bytes",
+      "hex": "f158aeb8fabb6903"
+    },
+    {
+      "kind": "string",
+      "hex": "579cd40d6ad80f3207cc855b3ddb50615799d3003f8d0f3055cb810e3f8351610898d00e6edc0860079fd50a388e513103cbd70e6adb5965"
+    },
+    {
+      "kind": "string",
+      "hex": "0390d50a38885e621c9e820d68975d3704cc9b00688d5e2e55ce810a3f8258300199d05c"
+    },
+    {
+      "kind": "string",
+      "hex": "50ced05037d308775486c55134ca0c661fded8"
+    },
+    {
+      "kind": "string",
+      "hex": ""
+    },
+    {
+      "kind": "string",
+      "hex": ""
+    },
+    {
+      "kind": "string",
+      "hex": ""
+    },
+    {
+      "kind": "bytes",
+      "hex": "0824b965"
+    },
+    {
+      "kind": "bytes",
+      "hex": "86bdeb953b854455a871febbfdaa4013e0d1576193fd06ec63ec7f27353c3f11677e00f33eaca880c4c59f1bdc29a7c1f4d39bfc7271f2b9031aa4a8bd1837f3dfbda7cde096f4dad7ee87f7e6d7156b0e63ffb160a34ab8230b914e676bb324c34239205729fcb2a20375a0f91f8b74b60fe21df93795d31ee4ae1a4a6101cf860e8798820937816cb13ba4ee11da35c9d60cafb34e8b67a59db4a8d2"
+    },
+    {
+      "kind": "bytes",
+      "hex": "b3518086"
+    },
+    {
+      "kind": "bytes",
+      "hex": "21ecdcfa9c424c5e"
+    },
+    {
+      "kind": "bytes",
+      "hex": "a964075fe55f3ec313d5d53e297abf7e1b7ad5325e3515d972c4a66e2681d0887bbf1e5e4d7b7c6a6386ce3418ce44f77473df0ca564f59e427a94d3211dd9d231a7ee0b6b13a2de9e13a663bdbdec4e5be07f0419cb62c321"
+    }
+  ],
+  "fields": [
+    {
+      "index": 40,
+      "kind": "uint16",
+      "value": 46716
+    },
+    {
+      "index": 8,
+      "kind": "int32",
+      "value": 1652981902
+    },
+    {
+      "index": 51,
+      "kind": "int32",
+      "value": 2013297462
+    },
+    {
+      "index": 46,
+      "kind": "uint16",
+      "value": 38575
+    },
+    {
+      "index": 0,
+      "kind": "uint8",
+      "value": 94
+    },
+    {
+      "index": 26,
+      "kind": "offset",
+      "value": 11
+    },
+    {
+      "index": 50,
+      "kind": "offset",
+      "value": 0
+    },
+    {
+      "index": 24,
+      "kind": "uint8",
+      "value": 52
+    },
+    {
+      "index": 35,
+      "kind": "uint8",
+      "value": 35
+    },
+    {
+      "index": 55,
+      "kind": "offset",
+      "value": 2
+    },
+    {
+      "index": 44,
+      "kind": "uint8",
+      "value": 39
+    },
+    {
+      "index": 7,
+      "kind": "uint16",
+      "value": 33969
+    },
+    {
+      "index": 32,
+      "kind": "uint16",
+      "value": 42036
+    },
+    {
+      "index": 1,
+      "kind": "uint8",
+      "value": 172
+    },
+    {
+      "index": 5,
+      "kind": "uint8",
+      "value": 146
+    },
+    {
+      "index": 34,
+      "kind": "uint8",
+      "value": 254
+    },
+    {
+      "index": 49,
+      "kind": "uint16",
+      "value": 62392
+    },
+    {
+      "index": 36,
+      "kind": "offset",
+      "value": 12
+    },
+    {
+      "index": 45,
+      "kind": "uint8",
+      "value": 195
+    },
+    {
+      "index": 11,
+      "kind": "uint8",
+      "value": 54
+    },
+    {
+      "index": 53,
+      "kind": "offset",
+      "value": 14
+    },
+    {
+      "index": 18,
+      "kind": "uint8",
+      "value": 6
+    },
+    {
+      "index": 13,
+      "kind": "uint8",
+      "value": 183
+    },
+    {
+      "index": 31,
+      "kind": "uint8",
+      "value": 50
+    },
+    {
+      "index": 54,
+      "kind": "uint8",
+      "value": 163
+    },
+    {
+      "index": 39,
+      "kind": "uint8",
+      "value": 44
+    },
+    {
+      "index": 29,
+      "kind": "int32",
+      "value": -1205365112
+    },
+    {
+      "index": 43,
+      "kind": "uint16",
+      "value": 51336
+    },
+    {
+      "index": 56,
+      "kind": "offset",
+      "value": 1
+    },
+    {
+      "index": 4,
+      "kind": "offset",
+      "value": 13
+    },
+    {
+      "index": 10,
+      "kind": "uint8",
+      "value": 176
+    },
+    {
+      "index": 14,
+      "kind": "int32",
+      "value": -1981183484
+    },
+    {
+      "index": 17,
+      "kind": "offset",
+      "value": 3
+    },
+    {
+      "index": 38,
+      "kind": "offset",
+      "value": 5
+    },
+    {
+      "index": 22,
+      "kind": "offset",
+      "value": 15
+    },
+    {
+      "index": 6,
+      "kind": "uint8",
+      "value": 178
+    },
+    {
+      "index": 12,
+      "kind": "uint8",
+      "value": 127
+    },
+    {
+      "index": 23,
+      "kind": "uint8",
+      "value": 191
+    },
+    {
+      "index": 42,
+      "kind": "offset",
+      "value": 8
+    },
+    {
+      "index": 16,
+      "kind": "uint16",
+      "value": 46865
+    },
+    {
+      "index": 48,
+      "kind": "float32",
+      "value": 1
+    },
+    {
+      "index": 28,
+      "kind": "uint8",
+      "value": 138
+    },
+    {
+      "index": 19,
+      "kind": "uint8",
+      "value": 253
+    },
+    {
+      "index": 30,
+      "kind": "offset",
+      "value": 9
+    },
+    {
+      "index": 15,
+      "kind": "uint16",
+      "value": 22989
+    },
+    {
+      "index": 27,
+      "kind": "int32",
+      "value": 985381657
+    },
+    {
+      "index": 33,
+      "kind": "offset",
+      "value": 4
+    },
+    {
+      "index": 37,
+      "kind": "offset",
+      "value": 10
+    },
+    {
+      "index": 52,
+      "kind": "uint16",
+      "value": 4106
+    },
+    {
+      "index": 9,
+      "kind": "uint16",
+      "value": 64283
+    },
+    {
+      "index": 2,
+      "kind": "uint8",
+      "value": 195
+    },
+    {
+      "index": 3,
+      "kind": "offset",
+      "value": 6
+    },
+    {
+      "index": 25,
+      "kind": "int32",
+      "value": 1204721890
+    },
+    {
+      "index": 47,
+      "kind": "uint8",
+      "value": 20
+    },
+    {
+      "index": 21,
+      "kind": "int32",
+      "value": -1234121296
+    },
+    {
+      "index": 20,
+      "kind": "uint8",
+      "value": 0
+    },
+    {
+      "index": 41,
+      "kind": "offset",
+      "value": 7
+    }
+  ],
+  "expected_payload_hex": "7c00000000007600ac009d0085001b0014005c00840047008800a4001c005b007a004600720054002e003e0050007300360000000800480045009300100098002800370068003000710086002400830092007c0020004c006f00aa000400400066008b007b009e000f00380080009400a0001e00740070008c00600076000000e0010000b0cd70b600000014e298ce47e8010000000000c31bfb0a10ac0100004402000019bbbb3a0000cd59a40100000000fd8a0000803f000011b79c01000000bf7fb264000000dc01000024020000048ae989000000b0bc0000003c020000000088c8889627b80000002ca332b70698000000000036c3a4000000b8f300fe92ac34a4b1840027f001000000002334140200002c010000005eaf96367b00788e80866200007cb659000000a964075fe55f3ec313d5d53e297abf7e1b7ad5325e3515d972c4a66e2681d0887bbf1e5e4d7b7c6a6386ce3418ce44f77473df0ca564f59e427a94d3211dd9d231a7ee0b6b13a2de9e13a663bdbdec4e5be07f0419cb62c3210000000800000021ecdcfa9c424c5e04000000b35180869d00000086bdeb953b854455a871febbfdaa4013e0d1576193fd06ec63ec7f27353c3f11677e00f33eaca880c4c59f1bdc29a7c1f4d39bfc7271f2b9031aa4a8bd1837f3dfbda7cde096f4dad7ee87f7e6d7156b0e63ffb160a34ab8230b914e676bb324c34239205729fcb2a20375a0f91f8b74b60fe21df93795d31ee4ae1a4a6101cf860e8798820937816cb13ba4ee11da35c9d60cafb34e8b67a59db4a8d2000000040000000824b9650000000000000000000000000000000000000000000000001300000050ced05037d308775486c55134ca0c661fded800240000000390d50a38885e621c9e820d68975d3704cc9b00688d5e2e55ce810a3f8258300199d05c0000000038000000579cd40d6ad80f3207cc855b3ddb50615799d3003f8d0f3055cb810e3f8351610898d00e6edc0860079fd50a388e513103cbd70e6adb59650000000008000000f158aeb8fabb690300000000000000001b0000000fe30575c20d7e45389b162aa48a475d3cccf6b12039be29ba56b6000800000031a8b6395bba690308000000346366633933656100000000",
+  "headers": {
+    "x-sap-ri": "998fe16af01746a521cf1434050182a2aff7d63255f6dfb443b2",
+    "x-sap-sec": "6ocVNlHuG5HElfwCl5pClONC65hFlH6CizpvlkwCc5oblHuC35pDlkACqAoalOrC85pdlIjCW5oplINCl5pflruCFRhul4pC+5pBlIRC15pslOHCcAp/lH5CBAoIlJpCA5oRleXCm5oClPNCdzorlSjCzzpOlHpCM5hKl4jCt5oslHwCv5oSl5pCE5HClEsmnENCl5pvE1nyFGuGl5pCl5swiCAifewGl5oxlApCi/FrYApC5+U/lRpCl5sJdApCQIzCl4eHN5HCl5h5uxk/l5pCr5HClJ2Yl5pxdtUgl5pCKEwCl5pIlApCl5hf4Ht1ZxuCl5pQ/lPHm1uCl5pClIBw35pClEnplsgq6IL/K62CZCpGl5pClJ5Eg5rClJwGl5pCXUm1GWACqHgCc8rClOGS9RpCle1/mil3XlfwfY/UwF1k2fjXqq6oXD6UkBOx38j7Q0hfqxzTXXaruP92cujEipixhf0przG3Us3TDW8vOmHFk0rh3Gjj1yJ0r1ju38JJ2LYy9Go5m4vjvu5Ll5pCy5pClJEQrs8DDXYTm5pClE4tQHMFl5pCcvxNMQFZFk3BnKgrp39CfGst8geupRBQvGY5Zl6IwyS6uAspwUGBQpKZNyDDa3QGhoJXpOkhsvVwiULB2duHsYmJ3wxKMnK9PGgbhGBVgMAyvCmhve4i0J5jBNi61x5/IjrPxkRMpEP0lf3KodmjtENzETxPGa/ujtLdiX9Ll2mazVcWQAVHQMGhYZKdf0Xe40Nl6x4ydgc3N/LBOApCl52Cl5pfZE13l5pCl5pCl5pCl5pCl5pCl5pCl5pCl5pCfzpClksyOkpHOzqH8HBZWQKizPNArquCZ5pCl5JnPRXOdki0jSgYzMtVXQRx5SAC1HaTb9/yQRX5Q9usl7vnX5pCl5pOl5pC8aCvzMWWzlrb5H7Xw0Tnv+c8Ozp5RRzs82FGzDmwWMHf+opyVqwfv5cAPRXOR9HhlwDVz8WX9M6Cl5pCy5pClsSW6vnk0gVwl5pCl5pCl5pXl5pCzG5Zt2rmuX6O+yN+3H9bXQClhvHKY/jM09MSl5uCl5ph7ENP9x9MlzuCl5pEvg+2YQ43vRpCl5s="
+  }
+}

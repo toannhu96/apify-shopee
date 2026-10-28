@@ -1,6 +1,11 @@
 .venv/
 __pycache__/
 .pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
 # Browser profile holds the logged-in Shopee session cookies
 .auth/
 output/
+# Open API credentials
+.env
