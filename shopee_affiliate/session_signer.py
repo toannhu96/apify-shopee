@@ -54,7 +54,10 @@ def _metadata(headers):
     salsa_values = {v['pc']: v['value'] for v in parse_collection('salsa', salsa)}
     mask32 = int.from_bytes(mask[:4], 'little')
     counters = [request['path_count']] + [salsa_values[key] ^ mask32 ^ constant
-        for key, constant in ((36744, 3882804305), (35838, 604268431), (37224, 1471809388))]
+        for key, constant in ((36744, 3882804305), (35838, 604268431),
+                              (37224, 1471809388), (36975, 3663584677))]
+    page_xhr = raw['canonical_fields'][28]['value'] & UINT32_MAX
+    counters += [page_xhr ^ mask32 ^ 2959024693]
     return timestamp, request, raw['canonical_fields'][5]['value'], counters
 
 
@@ -121,6 +124,8 @@ def reserve_request(item_id: str | int, state: Mapping,
 
 The caller must hold an exclusive, fenced per-account lease and durably store
 the new state before sending the request. Reusing an old reservation is unsafe.
+Managed sessions continue the browser's XHR hook, including its global and
+captured-page request counts. The low-level signer retains standalone mode.
 """
     url, now = urlsplit(product_url(item_id)), _clock(now_ms)
     try:
@@ -138,7 +143,7 @@ the new state before sending the request. Reusing an old reservation is unsafe.
             new_random=secrets.token_bytes(8), raw_url=url.path + '?' + url.query,
             timestamp_ms=now, refresh_collection=refresh_collection, advance_request=True,
             request_rate=60 * total / max(60, elapsed), elapsed_seconds=elapsed,
-            root_request_rate=60 * count / max(60, (now - start) // 1000))
+            root_request_rate=60 * count / max(60, (now - start) // 1000), advance_xhr=True)
         fresh = {**headers, **signed, 'af-ac-enc-dat': secrets.token_bytes(8).hex()}
         next_state = {**current, 'headers': dict(fresh), 'last_ms': now, 'path_count': total,
                       'window_started_ms': start, 'window_count': count}

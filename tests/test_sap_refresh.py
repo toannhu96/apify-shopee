@@ -2,8 +2,8 @@ import json
 from pathlib import Path
 
 from shopee_affiliate.sap_codec import decode_sec
-from shopee_affiliate.sap_state import decode_payload
 from shopee_affiliate.sap_refresh import rekey_scalar_fields
+from shopee_affiliate.sap_state import decode_payload
 
 
 def test_all_root_fields_match_original_sdk_key_change():
@@ -23,7 +23,7 @@ def test_root_assembly_matches_original_sdk_with_oracle_collection_callback():
     before = fixture['before_headers']
     for case in fixture['cases']:
         calls = []
-        def oracle(kind, plaintext, context):
+        def oracle(kind, plaintext, context, calls=calls, case=case):
             calls.append(kind)
             assert plaintext
             assert context.old_ri == before['x-sap-ri']
@@ -42,6 +42,7 @@ def test_root_assembly_matches_original_sdk_with_oracle_collection_callback():
 
 def test_root_refresh_rejects_missing_semantic_callback():
     import pytest
+
     from shopee_affiliate.sap_refresh import refresh_root
     with pytest.raises(ValueError, match='callback'):
         refresh_root('', '', '', new_mask=bytes(8), new_random=bytes(8),
@@ -67,6 +68,7 @@ def test_root_refresh_preserves_original_renderer_placeholder():
 
 def test_root_refresh_rejects_invalid_callback_output():
     import pytest
+
     from shopee_affiliate.sap_refresh import refresh_root
     fixture = json.loads((Path(__file__).parent / 'fixtures/sap_root_refresh_golden.json').read_text())
     before, case = fixture['before_headers'], fixture['cases'][0]
@@ -75,11 +77,12 @@ def test_root_refresh_rejects_invalid_callback_output():
             refresh_root(before['x-sap-sec'], before['x-sap-ri'], case['target_headers']['x-sap-ri'],
                 new_mask=bytes.fromhex(case['new_mask_hex']), new_random=bytes.fromhex(case['new_random_hex']),
                 raw_url=case['raw_url'], timestamp_ms=case['timestamp_ms'],
-                refresh_collection=lambda kind, plaintext, context: invalid)
+                refresh_collection=lambda kind, plaintext, context, invalid=invalid: invalid)
 
 
 def test_advanced_request_keeps_root_window_rate_separate_from_total_rate():
     import struct
+
     from shopee_affiliate.sap_refresh import refresh_root
     fixture = json.loads((Path(__file__).parent / 'fixtures/sap_root_refresh_golden.json').read_text())
     before, case = fixture['before_headers'], fixture['cases'][0]
@@ -101,6 +104,7 @@ def test_advanced_request_keeps_root_window_rate_separate_from_total_rate():
 
 def test_request_counter_inputs_are_validated_before_callbacks():
     import pytest
+
     from shopee_affiliate.sap_refresh import refresh_root
     for advance, rate in [(True, None), (True, float('nan')), (True, float('inf')),
         (True, -float('inf')), (True, -0.1), (True, 3.5e38), (True, 10**1000), (True, True),
@@ -114,6 +118,7 @@ def test_request_counter_inputs_are_validated_before_callbacks():
 
 def test_request_elapsed_seconds_requires_explicit_uint32_when_advancing():
     import pytest
+
     from shopee_affiliate.sap_refresh import refresh_root
     for advance, elapsed in [(True, None), (True, -1), (True, 2**32),
                              (True, 1.0), (True, True), (True, '1'), (False, 0)]:
@@ -127,6 +132,7 @@ def test_request_elapsed_seconds_requires_explicit_uint32_when_advancing():
 
 def test_root_window_rate_requires_explicit_finite_float32_when_advancing():
     import pytest
+
     from shopee_affiliate.sap_refresh import refresh_root
     for advance, root_rate in [(True, None), (True, -1), (True, float('nan')),
                               (True, float('inf')), (True, 3.5e38), (True, True), (False, 1)]:
@@ -152,3 +158,38 @@ def test_aged_request_matches_original_sdk_with_separate_window_rate():
         detector_padding=bytes(fixture['padding']), advance_request=True,
         request_rate=120/415, elapsed_seconds=415, root_request_rate=1)
     assert actual == target
+
+
+def test_xhr_requires_explicit_boolean_and_request_advancement():
+    import pytest
+
+    from shopee_affiliate.sap_refresh import refresh_root
+    for advance_xhr, advance_request in [(True, False), (1, True), ('true', True)]:
+        with pytest.raises(ValueError, match='advance_xhr'):
+            refresh_root('', '', '', new_mask=bytes(8), new_random=bytes(8),
+                raw_url='/api/v3/offer/product', timestamp_ms=0,
+                refresh_collection=lambda *args: pytest.fail('must validate first'),
+                advance_xhr=advance_xhr, advance_request=advance_request)
+
+
+def test_xhr_page_counter_rejects_overflow_and_invalid_scalar_type():
+    import pytest
+
+    from shopee_affiliate.sap_refresh import RefreshContext, _refresh_fields
+    sample = json.loads((Path(__file__).parent / 'fixtures/sap_xhr_lifecycle_golden.json').read_text())
+    headers = sample['requests'][0]['headers']
+    old = decode_payload(decode_sec(headers['x-sap-sec'], headers['x-sap-ri']).payload,
+                         headers['x-sap-ri'])
+    mask = bytes.fromhex(old['vectors'][1]['hex'])
+    random = bytes.fromhex(old['vectors'][14]['hex'])
+    context = RefreshContext(mask, mask, random, random, sample['raw_url'],
+        sample['requests'][0]['timestamp_ms'], headers['x-sap-ri'], headers['x-sap-ri'],
+        advance_request=True, request_rate=1, elapsed_seconds=0, root_request_rate=1,
+        advance_xhr=True)
+    exhausted = 0xffffffff ^ int.from_bytes(mask[:4], 'little') ^ 2959024693
+    exhausted = exhausted if exhausted < 2**31 else exhausted - 2**32
+    for value, error in [(exhausted, 'overflow'), (True, 'scalar value'), (1.5, 'scalar value')]:
+        altered = {**old, 'canonical_fields': {**old['canonical_fields'],
+                   28: {'kind': 'int32', 'value': value}}}
+        with pytest.raises(ValueError, match=error):
+            _refresh_fields(altered, context, old['vectors'])

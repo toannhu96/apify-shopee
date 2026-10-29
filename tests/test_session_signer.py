@@ -32,25 +32,25 @@ def decoded(value):
     return state, request
 
 
+def direct_sdk_refresh(seed, reference):
+    """Independent standalone fixtures omit the browser's XHR send wrapper."""
+    target = reference['target_headers']
+    target_state, request = decoded(target)
+    vectors = [bytes.fromhex(v['hex']) for v in target_state['vectors']]
+    return signer.refresh_root(seed['x-sap-sec'], seed['x-sap-ri'], target['x-sap-ri'],
+        new_mask=vectors[1], new_random=vectors[14], raw_url=reference['raw_url'],
+        timestamp_ms=reference['timestamp_ms'], refresh_collection=signer.refresh_collection,
+        detector_padding=vectors[2], advance_request=True,
+        request_rate=request['request_rate'], elapsed_seconds=request['elapsed_seconds'],
+        root_request_rate=target_state['canonical_fields'][5]['value'])
+
+
 @pytest.mark.parametrize('name', ['sap_collection_sequence_time_golden.json',
                                  'sap_root_window_aged_golden.json'])
-def test_sequence_matches_original_sdk_fixture(monkeypatch, name):
+def test_lowlevel_direct_sequence_matches_original_sdk_fixture(name):
     reference = fixture(name)
-    target = reference['target_headers']
-    target_state, _ = decoded(target)
-    vectors = [bytes.fromhex(v['hex']) for v in target_state['vectors']]
-    entropy = iter((decode_ri(target['x-sap-ri']).raw[4:], vectors[1][1::2],
-                    vectors[14], vectors[2], bytes(8)))
-    monkeypatch.setattr(signer.secrets, 'token_bytes', lambda count: next(entropy))
-    seed = headers(reference['before_headers'])
-    state = signer.initialize_session(seed, now_ms=reference['timestamp_ms'])
-    before = copy.deepcopy(state)
-    fresh, updated = signer.reserve_request(reference['raw_url'].split('item_id=')[1], state,
-                                             now_ms=reference['timestamp_ms'])
-    assert {k: fresh[k] for k in target} == target
-    assert state == before
-    assert updated['path_count'] == state['path_count'] + 1
-    assert json.loads(json.dumps(updated)) == updated
+    fresh = direct_sdk_refresh(reference['before_headers'], reference)
+    assert fresh == reference['target_headers']
 
 
 def test_many_requests_accumulate_and_restore_across_windows():
@@ -177,23 +177,16 @@ def test_internal_counters_must_not_wrap(monkeypatch):
         signer.reserve_request('1', state, now_ms=1800000010000)
 
 
-def test_response_completion_matches_original_sdk_xhr_handler(monkeypatch):
+def test_response_completion_matches_original_sdk_xhr_handler():
     reference = fixture('sap_response_sequence_golden.json')
-    target = reference['target_headers']
-    target_state, _ = decoded(target)
-    vectors = [bytes.fromhex(v['hex']) for v in target_state['vectors']]
-    entropy = iter((decode_ri(target['x-sap-ri']).raw[4:], vectors[1][1::2],
-                    vectors[14], vectors[2], bytes(8)))
-    monkeypatch.setattr(signer.secrets, 'token_bytes', lambda count: next(entropy))
     state = signer.initialize_session(headers(reference['before_headers']), now_ms=1800000000000)
     before = copy.deepcopy(state)
     completed = signer.record_response(state)
     assert state == before
     assert {k: v for k, v in completed.items() if k != 'headers'} == {
         k: v for k, v in state.items() if k != 'headers'}
-    fresh, _ = signer.reserve_request('26609048170', json.loads(json.dumps(completed)),
-                                      now_ms=reference['timestamp_ms'])
-    assert {k: fresh[k] for k in target} == target
+    fresh = direct_sdk_refresh(completed['headers'], reference)
+    assert fresh == reference['target_headers']
 
 
 def test_response_completion_preserves_tokens_and_detects_invalid_state():
@@ -229,3 +222,19 @@ def test_response_completion_rejects_invalid_window_clock(window_start):
     state = signer.initialize_session(headers(), now_ms=1800000000000)
     with pytest.raises(ValueError):
         signer.record_response({**state, 'window_started_ms': window_start})
+
+
+def test_managed_requests_match_five_original_sdk_xhr_lifecycles(monkeypatch):
+    reference = fixture('sap_xhr_lifecycle_golden.json')['requests']
+    state = signer.initialize_session(headers(reference[0]['headers']),
+                                      now_ms=reference[0]['timestamp_ms'])
+    for target in reference[1:]:
+        state = signer.record_response(json.loads(json.dumps(state)))
+        target_headers = target['headers']
+        target_state, _ = decoded(target_headers)
+        vectors = [bytes.fromhex(v['hex']) for v in target_state['vectors']]
+        entropy = iter((decode_ri(target_headers['x-sap-ri']).raw[4:], vectors[1][1::2],
+                        vectors[14], vectors[2], bytes(8)))
+        monkeypatch.setattr(signer.secrets, 'token_bytes', lambda count, entropy=entropy: next(entropy))
+        fresh, state = signer.reserve_request('26609048170', state, now_ms=target['timestamp_ms'])
+        assert {k: fresh[k] for k in target_headers} == target_headers

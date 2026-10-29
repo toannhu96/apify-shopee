@@ -250,6 +250,12 @@ def refresh_collection(kind: str, plaintext: bytes, context) -> bytes:
         raise ValueError('elapsed_seconds requires advance_request')
     counter_constants = {37057: 3947457725, 36744: 3882804305,
                          35838: 604268431, 37224: 1471809388}
+    advance_xhr = getattr(context, 'advance_xhr', False)
+    if type(advance_xhr) is not bool or (advance_xhr and not advance):
+        raise ValueError('advance_xhr requires advance_request')
+    if advance_xhr:
+        # SDK7116 increments module3023.XaQ before signing each XHR send.
+        counter_constants = {**counter_constants, 36975: 3663584677}
     old_u32 = int.from_bytes(old[:4], 'little')
     new_u32 = int.from_bytes(new[:4], 'little')
     refreshed = []
@@ -258,7 +264,9 @@ def refresh_collection(kind: str, plaintext: bytes, context) -> bytes:
         if advance and item['pc'] in counter_constants:
             constant = counter_constants[item['pc']]
             count = value ^ old_u32 ^ constant
-            value = ((count + 1) & 0xffffffff) ^ new_u32 ^ constant
+            if count == 0xffffffff:
+                raise ValueError('Request counter overflow')
+            value = (count + 1) ^ new_u32 ^ constant
         elif advance and item['pc'] == 37604:
             value = requested_rate
         elif advance and item['pc'] == 36280:

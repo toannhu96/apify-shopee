@@ -4,16 +4,20 @@ This does not generate missing browser state or refresh its age-dependent meanin
 Original SDK pairs verified all 57 canonical fields, including special hash field43.
 """
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
-
 from zlib import adler32
+
 from .sap_codec import decode_ri, decode_sec, encode_sec
 from .sap_crypto import decode_collection, encode_collection
 from .sap_detector import decode_detectors, encode_detectors
 from .sap_payload import build_payload
-from .sap_request import (derive_slot_rotation, encode_request_timestamp,
-                          request_url_digest, xor_repeating)
+from .sap_request import (
+    derive_slot_rotation,
+    encode_request_timestamp,
+    request_url_digest,
+    xor_repeating,
+)
 from .sap_state import FIELD_ORDER, decode_payload
 
 
@@ -70,6 +74,7 @@ class RefreshContext:
     request_rate: float | None = None
     elapsed_seconds: int | None = None
     root_request_rate: float | None = None
+    advance_xhr: bool = False
 
 
 def _refresh_vectors(old, context, refresh_collection, detector_padding):
@@ -104,6 +109,16 @@ def _refresh_fields(old, context, vectors):
                                    context.new_mask)
     if context.advance_request:
         canonical = {**canonical, 5: {'kind': 'float32', 'value': context.root_request_rate}}
+    if context.advance_xhr:
+        # SDK3023.VVr(location.href): XHR requests from the captured page.
+        field = canonical[28]
+        mask = int.from_bytes(context.new_mask[:4], 'little')
+        count = (field['value'] & 0xffffffff) ^ mask ^ 2959024693
+        if count == 0xffffffff:
+            raise ValueError('XHR page counter overflow')
+        value = (count + 1) ^ mask ^ 2959024693
+        canonical = {**canonical, 28: {'kind': 'int32',
+            'value': value if value < 2**31 else value - 2**32}}
     mask16 = int.from_bytes(context.new_mask[:2], 'little')
     canonical = {**canonical,
         9: {'kind': 'uint16', 'value': len(bytes.fromhex(vectors[12]['hex'])) ^ mask16 ^ 47270},
@@ -141,7 +156,8 @@ def refresh_root(old_sec: str, old_ri: str, new_ri: str, *, new_mask: bytes,
                  refresh_collection: Callable[[str, bytes, RefreshContext], bytes],
                  detector_padding: bytes | None = None, advance_request: bool = False,
                  request_rate: float | None = None, elapsed_seconds: int | None = None,
-                 root_request_rate: float | None = None) -> dict[str, str]:
+                 root_request_rate: float | None = None,
+                 advance_xhr: bool = False) -> dict[str, str]:
     """Assemble a refreshed root using a required semantic collection callback.
 
     Callback receives kind ('custom'/'salsa'), verified decrypted plaintext and
@@ -150,18 +166,22 @@ def refresh_root(old_sec: str, old_ri: str, new_ri: str, *, new_mask: bytes,
     must supply source-derived elapsed_seconds, request_rate (total path rate) and
     root_request_rate (separate 120-second path-window rate for canonical field5).
     No clock or missing window anchor is inferred.
+    advance_xhr additionally models SDK7116's XHR send hook: total XHR count
+    and requests from the captured page. Standalone generateSignEntry omits it.
     This low-level API accepts explicit masks for SDK parity tests; its caller
     must enforce agreement between mask time, RI time and timestamp_ms.
     """
     if not callable(refresh_collection):
-        raise ValueError('A source-derived collection refresh callback is required')
+        raise ValueError('A source-derived collection refresh callback is required')  # noqa: TRY004 - stable validation API
+    if type(advance_xhr) is not bool or (advance_xhr and not advance_request):
+        raise ValueError('advance_xhr requires advance_request=True')
     _validate_request_rate(advance_request, request_rate, elapsed_seconds, root_request_rate)
     new_mask, new_random = _key(new_mask), _key(new_random)
     ri = decode_ri(new_ri)
     old = decode_payload(decode_sec(old_sec, old_ri).payload, old_ri)
     context = RefreshContext(bytes.fromhex(old['vectors'][1]['hex']), new_mask,
         bytes.fromhex(old['vectors'][14]['hex']), new_random, raw_url, timestamp_ms, old_ri, new_ri,
-        advance_request, request_rate, elapsed_seconds, root_request_rate)
+        advance_request, request_rate, elapsed_seconds, root_request_rate, advance_xhr)
     vectors = _refresh_vectors(old, context, refresh_collection, detector_padding)
     fields = _refresh_fields(old, context, vectors)
     payload = build_payload(vectors, fields, rotation=derive_slot_rotation(new_ri),
