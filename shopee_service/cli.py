@@ -109,6 +109,10 @@ def _parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest='command', required=True)
     commands.add_parser('init-db', help='Apply backend database migrations')
     commands.add_parser('list-accounts', help='Show safe account aliases and health only')
+    rotate = commands.add_parser('rotate-secret-key', help='Re-encrypt stored sessions during stopped-service maintenance')
+    rotate.add_argument('--new-key-file', required=True, help='Protected new Fernet key file (mode 600)')
+    rotate.add_argument('--maintenance-confirmed', action='store_true',
+                        help='Confirm all API, worker and account-administration processes are stopped')
     for command in ('add-account', 'replace-session'):
         sub = commands.add_parser(command, help='Install a pending session; verify it before use')
         sub.add_argument('alias', type=_alias)
@@ -127,6 +131,14 @@ def _run(args, repo) -> int:
     if args.command == 'init-db':
         repo.migrate()
         print('Database migrations applied.')
+    elif args.command == 'rotate-secret-key':
+        from .rotate import RotationError, rotate_credentials
+        try:
+            result = rotate_credentials(repo, _read_private(args.new_key_file, 128).rstrip('\r\n'),
+                                        maintenance_confirmed=args.maintenance_confirmed)
+        except RotationError as error:
+            raise OperatorError(str(error)) from None
+        print(json.dumps(result, sort_keys=True))
     elif args.command == 'list-accounts':
         rows = [{key: row.get(key) for key in ('alias', 'version', 'status')}
                 for row in repo.list_accounts()]

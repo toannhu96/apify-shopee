@@ -84,6 +84,30 @@ Back up the encryption key separately from database backups: without the key,
 stored sessions cannot be recovered. Rotating that key requires re-encrypting
 existing rows or re-importing sessions; do not simply replace it.
 
+### Rotate the session-encryption key
+
+Stop every API, worker and account-administration process before rotation. Keep
+PostgreSQL running. Leave `SH_SECRET_KEY` set to the old key for this command,
+and supply the new Fernet key in an owner-only regular file (mode 600):
+
+```bash
+python -m shopee_service.cli rotate-secret-key \
+  --new-key-file /operator/new-encryption-key --maintenance-confirmed
+```
+
+The command holds the repository lock, rejects outstanding leases or mixed keys,
+and atomically re-encrypts all accounts without changing their other fields. It
+prints counts only. Repeating it with the same old/new keys recognizes records
+already using the new key. Do not clear lease markers blindly if it refuses.
+After success, configure every service with the new key before restarting them.
+
+Key rotation does not revoke leaked Shopee cookies: invalidate those sessions and
+capture a fresh authorized login. Rotate an exposed API token in both services
+and Apify's secret `SH_BACKEND_TOKEN`. For an exposed database password, change
+the actual PostgreSQL role password using a trusted interactive tool, then update
+the connection URLs. Changing `POSTGRES_PASSWORD` alone does not update an
+initialized database.
+
 ## Account operations
 
 Account imports contain cookies, accepted signing headers and optional stable
