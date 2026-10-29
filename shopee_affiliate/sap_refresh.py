@@ -166,8 +166,9 @@ def refresh_root(old_sec: str, old_ri: str, new_ri: str, *, new_mask: bytes,
     must supply source-derived elapsed_seconds, request_rate (total path rate) and
     root_request_rate (separate 120-second path-window rate for canonical field5).
     No clock or missing window anchor is inferred.
-    advance_xhr additionally models SDK7116's XHR send hook: total XHR count
-    and requests from the captured page. Standalone generateSignEntry omits it.
+    advance_xhr models fully initialized SDK7116 XHR hooks: initialized signing
+    count, total XHR count and requests from the captured page. Standalone
+    generateSignEntry omits this lifecycle.
     This low-level API accepts explicit masks for SDK parity tests; its caller
     must enforce agreement between mask time, RI time and timestamp_ms.
     """

@@ -129,8 +129,9 @@ HTTP/API responses. This update commits atomically with the job or verification
 outcome under the same account lease; stale or duplicate outcomes cannot advance
 the counters again. Transport timeouts do not count as received responses.
 Managed reservations also advance the browser XHR hook's global and page request
-counts. Regression fixtures cover five complete hook/sign/response cycles from
-the original SDK, rather than calling its standalone signature generator alone.
+counts and the initialized SDK's signing counter. Regression fixtures cover full
+SDK initialization followed by five complete hook/sign/response cycles. They do
+not establish server acceptance or model asynchronous browser state changes.
 
 ## Actor configuration and billing
 

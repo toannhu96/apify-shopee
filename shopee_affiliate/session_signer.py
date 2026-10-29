@@ -50,6 +50,7 @@ def _metadata(headers):
         raise ValueError('Signing seed timestamps disagree')
     custom = decode_collection(vectors[12], vectors[13], 'custom', mask, random)
     request = collection_request_state(custom, mask)
+    custom_values = {v['pc']: v['value'] for v in parse_collection('custom', custom)}
     salsa = decode_collection(vectors[15], vectors[11], 'salsa', mask, random)
     salsa_values = {v['pc']: v['value'] for v in parse_collection('salsa', salsa)}
     mask32 = int.from_bytes(mask[:4], 'little')
@@ -57,7 +58,8 @@ def _metadata(headers):
         for key, constant in ((36744, 3882804305), (35838, 604268431),
                               (37224, 1471809388), (36975, 3663584677))]
     page_xhr = raw['canonical_fields'][28]['value'] & UINT32_MAX
-    counters += [page_xhr ^ mask32 ^ 2959024693]
+    counters += [page_xhr ^ mask32 ^ 2959024693,
+                 custom_values[36354] ^ mask32 ^ 761331771]
     return timestamp, request, raw['canonical_fields'][5]['value'], counters
 
 

@@ -150,14 +150,16 @@ def test_response_completion_rejects_bad_mask(mask):
         complete_response_collection(b'', mask)
 
 
-def test_xhr_global_counter_rejects_overflow():
+@pytest.mark.parametrize('kind,pc,constant', [
+    ('salsa', 36975, 3663584677), ('custom', 36354, 761331771)])
+def test_xhr_lifecycle_counters_reject_overflow(kind, pc, constant):
     from dataclasses import replace
     sample = GOLDEN[0]
     mask = bytes.fromhex(sample['mask'])
-    fields = parse_collection('salsa', bytes.fromhex(sample['collections']['salsa']['plaintext']))
-    exhausted = [{**field, 'value': 0xffffffff ^ int.from_bytes(mask[:4], 'little') ^ 3663584677}
-                 if field['pc'] == 36975 else field for field in fields]
+    fields = parse_collection(kind, bytes.fromhex(sample['collections'][kind]['plaintext']))
+    exhausted = [{**field, 'value': 0xffffffff ^ int.from_bytes(mask[:4], 'little') ^ constant}
+                 if field['pc'] == pc else field for field in fields]
     ctx = replace(context(sample), advance_request=True, advance_xhr=True,
                   request_rate=1, elapsed_seconds=0)
     with pytest.raises(ValueError, match='overflow'):
-        refresh_collection('salsa', serialize_collection('salsa', exhausted), ctx)
+        refresh_collection(kind, serialize_collection(kind, exhausted), ctx)

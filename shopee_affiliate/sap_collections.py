@@ -254,8 +254,10 @@ def refresh_collection(kind: str, plaintext: bytes, context) -> bytes:
     if type(advance_xhr) is not bool or (advance_xhr and not advance):
         raise ValueError('advance_xhr requires advance_request')
     if advance_xhr:
-        # SDK7116 increments module3023.XaQ before signing each XHR send.
-        counter_constants = {**counter_constants, 36975: 3663584677}
+        # Full SDK7116.init() sets VFD; signing increments VFv through XaL.
+        # VVg emits VFv + bool(VFD). XHR send also increments global XaQ.
+        counter_constants = {**counter_constants, 36354: 761331771,
+                             36975: 3663584677}
     old_u32 = int.from_bytes(old[:4], 'little')
     new_u32 = int.from_bytes(new[:4], 'little')
     refreshed = []
