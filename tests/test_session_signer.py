@@ -175,3 +175,57 @@ def test_internal_counters_must_not_wrap(monkeypatch):
     monkeypatch.setattr(signer, '_metadata', exhausted)
     with pytest.raises(ValueError, match='counters'):
         signer.reserve_request('1', state, now_ms=1800000010000)
+
+
+def test_response_completion_matches_original_sdk_xhr_handler(monkeypatch):
+    reference = fixture('sap_response_sequence_golden.json')
+    target = reference['target_headers']
+    target_state, _ = decoded(target)
+    vectors = [bytes.fromhex(v['hex']) for v in target_state['vectors']]
+    entropy = iter((decode_ri(target['x-sap-ri']).raw[4:], vectors[1][1::2],
+                    vectors[14], vectors[2], bytes(8)))
+    monkeypatch.setattr(signer.secrets, 'token_bytes', lambda count: next(entropy))
+    state = signer.initialize_session(headers(reference['before_headers']), now_ms=1800000000000)
+    before = copy.deepcopy(state)
+    completed = signer.record_response(state)
+    assert state == before
+    assert {k: v for k, v in completed.items() if k != 'headers'} == {
+        k: v for k, v in state.items() if k != 'headers'}
+    fresh, _ = signer.reserve_request('26609048170', json.loads(json.dumps(completed)),
+                                      now_ms=reference['timestamp_ms'])
+    assert {k: fresh[k] for k in target} == target
+
+
+def test_response_completion_preserves_tokens_and_detects_invalid_state():
+    state = signer.initialize_session(headers(), now_ms=1800000000000)
+    completed = signer.record_response(state)
+    assert completed['headers']['af-ac-enc-sz-token'] == state['headers']['af-ac-enc-sz-token']
+    assert completed['headers']['x-sap-ri'] == state['headers']['x-sap-ri']
+    assert decoded(completed['headers'])[1] == decoded(state['headers'])[1]
+    before_raw, after_raw = decoded(state['headers'])[0], decoded(completed['headers'])[0]
+    assert before_raw['canonical_fields'] == after_raw['canonical_fields']
+    assert [i for i, (before, after) in enumerate(zip(before_raw['vectors'], after_raw['vectors']))
+            if before != after] == [12, 13]
+    with pytest.raises(ValueError):
+        signer.record_response({**state, 'path_count': 99})
+
+
+def test_response_completion_accepts_aged_import_with_reset_window():
+    seed = headers(fixture('sap_collection_sequence_time_golden.json')['target_headers'])
+    imported = signer.initialize_session(seed, now_ms=1800000200000)
+    before = copy.deepcopy(imported)
+    completed = signer.record_response(imported)
+    assert imported == before
+    assert completed['last_ms'] == 1800000012345
+    assert completed['window_started_ms'] == 1800000200000
+    assert completed['window_count'] == 0
+    fresh, reserved = signer.reserve_request('1', completed, now_ms=1800000200000)
+    assert decoded(fresh)[0]['canonical_fields'][5]['value'] == 1
+    assert reserved['window_count'] == 1
+
+
+@pytest.mark.parametrize('window_start', [True, '1800000200000', -1, 2**32 * 1000])
+def test_response_completion_rejects_invalid_window_clock(window_start):
+    state = signer.initialize_session(headers(), now_ms=1800000000000)
+    with pytest.raises(ValueError):
+        signer.record_response({**state, 'window_started_ms': window_start})

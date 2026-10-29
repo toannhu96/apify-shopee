@@ -90,6 +90,8 @@ Account imports contain cookies, accepted signing headers and optional stable
 proxy configuration. See [the source-client guide](shopee-affiliate-api.md) for the
 accepted export format. Use a seed from the first product request after a page
 reload; a recent seed with an unknown request-window anchor is rejected.
+Wait for that browser request to finish successfully before exporting. Import
+records its completed response once as part of initializing the session.
 
 For a local container import, mount a directory containing only the protected
 files needed for that account. Files must be mode 600 and readable by the service
@@ -122,6 +124,10 @@ Only one request per account is dispatched at a time. The initial minimum interv
 is six seconds, configurable upward with `SH_MIN_INTERVAL_SECONDS`. Reservations
 advance encrypted signing state before dispatch; a timed-out request does not
 roll the state back. This preserves request history but does not renew Shopee tokens.
+Received responses also advance the SDK completion counters, including rejected
+HTTP/API responses. This update commits atomically with the job or verification
+outcome under the same account lease; stale or duplicate outcomes cannot advance
+the counters again. Transport timeouts do not count as received responses.
 
 ## Actor configuration and billing
 

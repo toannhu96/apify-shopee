@@ -4,6 +4,7 @@ All modifying transactions share a short advisory lock. No network call occurs
 inside these transactions. This deliberately favors auditable coordination over
 maximum database throughput for the initial small account pool.
 """
+import logging
 import re
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -14,6 +15,8 @@ from uuid import uuid4
 import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
+
+LOGGER = logging.getLogger(__name__)
 
 LOCK_ID = 628941032
 SAFE_ID = re.compile(r'[A-Za-z0-9][A-Za-z0-9_-]{0,127}\Z')
@@ -254,6 +257,7 @@ class Repository:
             try:
                 work = self._reserve(conn, account, job['item_id'], reserve, job['attempts'] + 1)
             except (ValueError, KeyError, TypeError):
+                LOGGER.warning('Shopee failure phase=job_reservation category=signing')
                 self._incident(conn, account['alias'], 'verification')
                 return None
             conn.execute("UPDATE jobs SET status='leased',attempts=%s,account_alias=%s,account_version=%s,lease_token=%s,"
@@ -304,11 +308,22 @@ class Repository:
         conn.execute('UPDATE accounts SET lease_token=NULL,lease_until=NULL WHERE alias=%s AND lease_token=%s',
                      (work.account_alias, work.token))
 
-    def complete_job(self, work, result):
+    def _record_response(self, conn, work):
+        """Advance completed-response counters inside the fenced outcome transaction."""
+        from shopee_affiliate.session_signer import record_response
+        row = conn.execute('SELECT credentials FROM accounts WHERE alias=%s', (work.account_alias,)).fetchone()
+        credentials = self.cipher.decrypt(row['credentials'])
+        updated = {**credentials, 'signing_state': record_response(credentials['signing_state'])}
+        conn.execute('UPDATE accounts SET credentials=%s WHERE alias=%s',
+                     (self.cipher.encrypt(updated), work.account_alias))
+
+    def complete_job(self, work, result, *, response_received=False):
         with self._tx() as conn:
             self._maintenance(conn)
             if not self._current(conn, work):
                 return False
+            if response_received is True:
+                self._record_response(conn, work)
             conn.execute('INSERT INTO product_cache(item_id,account_alias,account_version,result,expires_at) '
                          "VALUES(%s,%s,%s,%s,now()+interval '15 minutes') ON CONFLICT(item_id) DO UPDATE SET "
                          'account_alias=EXCLUDED.account_alias,account_version=EXCLUDED.account_version,result=EXCLUDED.result,'
@@ -338,12 +353,14 @@ class Repository:
         self._alert(conn, f'{alias}:{row["version"]}:{row["incident"]}:{status}',
                     f'Shopee account {alias}: {status}. {action}', row['updated_at'])
 
-    def fail_job(self, work, code):
+    def fail_job(self, work, code, *, response_received=False):
         code = code if code in FAILURES else 'invalid_response'
         with self._tx() as conn:
             self._maintenance(conn)
             if not self._current(conn, work):
                 return False
+            if response_received is True:
+                self._record_response(conn, work)
             self._release(conn, work)
             if code in ('authentication', 'verification', 'signing', 'rate_limit'):
                 self._incident(conn, work.account_alias, code)
@@ -374,22 +391,30 @@ class Repository:
                 return None
             if account['status'] == 'disabled':
                 raise Conflict('Replace the disabled session before verifying')
-            return self._reserve(conn, account, item_id, reserve, 1, verification=True)
+            try:
+                return self._reserve(conn, account, item_id, reserve, 1, verification=True)
+            except (ValueError, KeyError, TypeError):
+                LOGGER.warning('Shopee failure phase=verification_reservation category=signing')
+                raise
 
-    def complete_verification(self, work):
+    def complete_verification(self, work, *, response_received=False):
         with self._tx() as conn:
             if not self._current(conn, work):
                 return False
+            if response_received is True:
+                self._record_response(conn, work)
             row = conn.execute("UPDATE accounts SET status='healthy',updated_at=now() WHERE alias=%s RETURNING updated_at", (work.account_alias,)).fetchone()
             self._release(conn, work)
             self._alert(conn, f'{work.account_alias}:{work.account_version}:recovery',
                         f'Shopee account {work.account_alias}: session validated and available.', row['updated_at'])
             return True
 
-    def fail_verification(self, work, code):
+    def fail_verification(self, work, code, *, response_received=False):
         with self._tx() as conn:
             if not self._current(conn, work):
                 return False
+            if response_received is True:
+                self._record_response(conn, work)
             self._release(conn, work)
             if code in ('authentication', 'verification', 'signing', 'rate_limit'):
                 self._incident(conn, work.account_alias, code)

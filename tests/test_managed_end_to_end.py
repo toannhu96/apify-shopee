@@ -1,11 +1,13 @@
 """Actor -> HTTP API -> real PostgreSQL -> worker; only external effects mocked."""
 import asyncio
+import json
 import os
 import socket
 import subprocess
 import sys
 import time
 from datetime import UTC, datetime
+from itertools import count
 from pathlib import Path
 from uuid import uuid4
 
@@ -17,6 +19,7 @@ from psycopg.conninfo import make_conninfo
 
 from shopee_actor.backend import BackendClient, Settings
 from shopee_actor.engine import Control, execute
+from shopee_affiliate import session_signer
 from shopee_service.api import create_app
 from shopee_service.repository import Repository
 from shopee_service.secrets import Cipher
@@ -33,11 +36,19 @@ def managed(monkeypatch):
         conn.execute(f'CREATE SCHEMA {schema}')
     repo = Repository(make_conninfo(dsn, options=f'-c search_path={schema}'), Cipher(Fernet.generate_key()))
     repo.migrate()
-    repo.replace_account('test', {'cookie_source': 'session=synthetic', 'signing_state': {'count': 1}})
+    # Exercise real cumulative request/response signing with public synthetic SDK
+    # fixtures. Only the external HTTP result and clock are controlled here.
+    fixture = json.loads((Path(__file__).parent / 'fixtures/sap_root_refresh_golden.json').read_text())
+    headers = {**fixture['before_headers'], 'af-ac-enc-sz-token': 'synthetic-token',
+               'user-agent': 'Synthetic SDK fixture', 'x-sz-sdk-version': '1.12.21'}
+    state = session_signer.record_response(session_signer.initialize_session(headers, now_ms=1800000000000))
+    repo.replace_account('test', {'cookie_source': 'session=synthetic', 'signing_state': state})
     with repo._tx() as conn:
         conn.execute("UPDATE accounts SET status='healthy'")
-    def reserve(_item, state):
-        return {'synthetic': 'reserved'}, {**state, 'count': state['count'] + 1}
+    request_clock = count(1800000006000, 6000)
+    real_reserve = session_signer.reserve_request
+    def reserve(item, state):
+        return real_reserve(item, state, now_ms=next(request_clock))
     monkeypatch.setattr('shopee_affiliate.session_signer.reserve_request', reserve)
     yield repo
     with psycopg.connect(dsn, autocommit=True) as conn:

@@ -13,15 +13,17 @@ from collections.abc import Mapping
 from urllib.parse import urlsplit
 
 from .http_transport import product_url
-from .sap_codec import decode_ri, decode_sec, encode_ri
+from .sap_codec import decode_ri, decode_sec, encode_ri, encode_sec
 from .sap_collections import (
     collection_request_state,
+    complete_response_collection,
     parse_collection,
     refresh_collection,
 )
-from .sap_crypto import decode_collection
+from .sap_crypto import decode_collection, encode_collection
+from .sap_payload import build_payload
 from .sap_refresh import refresh_root
-from .sap_request import derive_request_key, xor_repeating
+from .sap_request import derive_request_key, derive_slot_rotation, xor_repeating
 from .sap_signer import _seed
 from .sap_state import decode_payload
 
@@ -141,5 +143,37 @@ the new state before sending the request. Reusing an old reservation is unsafe.
         next_state = {**current, 'headers': dict(fresh), 'last_ms': now, 'path_count': total,
                       'window_started_ms': start, 'window_count': count}
         return fresh, next_state
+    except (KeyError, TypeError, OverflowError, IndexError):
+        raise ValueError('Signing state is invalid') from None
+
+
+def record_response(state: Mapping) -> dict:
+    """Return state after one received HTTP response, regardless of API status.
+
+    The caller must durably apply this once under the same fenced account lease
+    as the reservation. It is not idempotent and must not run after a timeout.
+    Updated headers are an internal state snapshot, not a request to replay.
+    """
+    try:
+        # Importing an aged seed can reset its window after the captured request.
+        # Validate at the latest stored event; completion does not advance time.
+        latest = max(_clock(state['last_ms']), _clock(state['window_started_ms']))
+        current = _validated_state(state, latest)
+        headers = current['headers']
+        ri = headers['x-sap-ri']
+        raw = decode_payload(decode_sec(headers['x-sap-sec'], ri).payload, ri)
+        vectors = [bytes.fromhex(value['hex']) for value in raw['vectors']]
+        mask, random = vectors[1], vectors[14]
+        plaintext = decode_collection(vectors[12], vectors[13], 'custom', mask, random)
+        completed = complete_response_collection(plaintext, mask)
+        data, checksum = encode_collection(completed, 'custom', mask, random)
+        replacements = {12: data, 13: checksum}
+        rebuilt_vectors = [{**value, 'hex': replacements[i].hex()} if i in replacements else value
+                           for i, value in enumerate(raw['vectors'])]
+        fields = [{'index': i, **value} for i, value in raw['canonical_fields'].items()]
+        payload = build_payload(rebuilt_vectors, fields, rotation=derive_slot_rotation(ri),
+                                renderer_placeholder=raw['renderer_placeholder'])
+        fresh = {**headers, 'x-sap-sec': encode_sec(payload, decode_ri(ri).xor_key)}
+        return {**current, 'headers': fresh}
     except (KeyError, TypeError, OverflowError, IndexError):
         raise ValueError('Signing state is invalid') from None

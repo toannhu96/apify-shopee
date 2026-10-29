@@ -29,7 +29,7 @@ def test_no_work_and_typed_failures_do_not_leak():
     repo.claim_job.return_value = work()
     error = DirectTransientError('never log this secret')
     assert process_one(repo, fetch=Mock(side_effect=error))
-    repo.fail_job.assert_called_once_with(work(), 'transient')
+    repo.fail_job.assert_called_once_with(work(), 'transient', response_received=False)
 
 
 def test_invalid_output_and_unexpected_exception_fail_safely():
@@ -51,7 +51,7 @@ def test_verify_never_stores_product():
     assert verify_account(repo,'primary','123',fetch=Mock()) is False
     repo.claim_verification.return_value = work()
     assert verify_account(repo,'primary','123',fetch=Mock(side_effect=DirectAuthenticationError('secret'))) is False
-    repo.fail_verification.assert_called_with(work(),'authentication')
+    repo.fail_verification.assert_called_with(work(),'authentication', response_received=False)
 
 
 def test_loop_cleanup_and_graceful_stop():
@@ -69,7 +69,7 @@ def test_verify_invalid_result_releases_with_safe_category():
     repo = Mock()
     repo.claim_verification.return_value = work()
     assert verify_account(repo,'primary','123',fetch=Mock(side_effect=RuntimeError('private'))) is False
-    repo.fail_verification.assert_called_with(work(),'invalid_response')
+    repo.fail_verification.assert_called_with(work(),'invalid_response', response_received=False)
 
 
 def test_loop_dispatches_alert_and_recovers_from_db_outage(monkeypatch):

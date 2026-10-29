@@ -143,8 +143,13 @@ def _fetch_validated(identifier: str, generated: Mapping[str, str], cookie: str,
         raise error_class(str(error)) from None
     except ValueError:
         raise direct.DirectInputError('Generated request inputs are invalid') from None
-    _check_status(response.status)
-    return direct._validate(response.body, identifier)
+    try:
+        _check_status(response.status)
+        return direct._validate(response.body, identifier)
+    except direct.DirectError as error:
+        # Carry bounded facts to private operator logs, never the response body.
+        raise type(error)(str(error), http_status=response.status, api_code=error.api_code,
+                          response_received=True) from None
 
 
 def _check_status(status: int) -> None:

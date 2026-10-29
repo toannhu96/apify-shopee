@@ -37,6 +37,12 @@ class DirectError(RuntimeError):
     """Safe-to-display error without request secrets or response contents."""
     category = 'invalid_response'
 
+    def __init__(self, message='', *, http_status=None, api_code=None, response_received=False):
+        super().__init__(message)
+        self.response_received = response_received is True
+        self.http_status = http_status if type(http_status) is int and 100 <= http_status <= 599 else None
+        self.api_code = api_code if type(api_code) is int and abs(api_code) < 10**10 else None
+
 
 class DirectBlockedError(DirectError):
     """Server rejected authentication or traffic; do not retry automatically."""
@@ -165,14 +171,14 @@ def _validate(raw: bytes, item_id: str) -> dict[str, Any]:
         raise DirectError("Unexpected product response structure")
     code = payload.get("error", payload.get("code"))
     if code in (90309999, "90309999"):
-        raise DirectVerificationError("Shopee rejected the request (API 90309999)")
+        raise DirectVerificationError("Shopee rejected the request (API 90309999)", api_code=90309999)
     if payload.get("is_login") is False:
-        raise DirectAuthenticationError("Shopee requires login or traffic verification")
+        raise DirectAuthenticationError("Shopee requires login or traffic verification", api_code=code)
     if payload.get("redirect_to_error_page") is True:
-        raise DirectVerificationError("Shopee requires login or traffic verification")
+        raise DirectVerificationError("Shopee requires login or traffic verification", api_code=code)
     if "error" in payload or type(code) is not int or code != 0:
         suffix = f" (API {code})" if type(code) is int and abs(code) < 10**10 else ""
-        raise DirectError("Shopee API request failed" + suffix)
+        raise DirectError("Shopee API request failed" + suffix, api_code=code)
     data = payload.get("data")
     if not isinstance(data, dict) or str(data.get("item_id")) != item_id:
         raise DirectError("Product response does not match requested item")

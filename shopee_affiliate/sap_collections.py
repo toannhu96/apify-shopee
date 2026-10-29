@@ -1,8 +1,7 @@
 """Typed collector layouts recovered from captured SDK writer call sites."""
-import struct
 import math
+import struct
 from zlib import adler32
-
 
 _LAYOUTS = {
     'custom': (
@@ -194,6 +193,30 @@ def collection_request_state(plaintext: bytes, request_mask: bytes) -> dict:
             'request_rate': fields[37604]}
 
 
+def complete_response_collection(plaintext: bytes, request_mask: bytes) -> bytes:
+    """Apply SDK7116's received-response Xad/XaR callbacks for this path.
+
+    Both fetch resolution and XHR readyState4 increment global VFC and path
+    VVc, without checking HTTP status or response body. Transport failures do
+    not imply receipt. These are separate from the request counters.
+    """
+    if not isinstance(request_mask, bytes) or len(request_mask) != 8:
+        raise ValueError('Expected eight-byte request mask')
+    mask = int.from_bytes(request_mask[:4], 'little')
+    constants = {36428: 2441765646, 37834: 4276226149}
+    refreshed = []
+    for item in parse_collection('custom', plaintext):
+        value = item['value']
+        if item['pc'] in constants:
+            constant = constants[item['pc']]
+            count = value ^ mask ^ constant
+            if count == 0xffffffff:
+                raise ValueError('Response counter overflow')
+            value = (count + 1) ^ mask ^ constant
+        refreshed.append({**item, 'value': value})
+    return serialize_collection('custom', refreshed)
+
+
 def refresh_collection(kind: str, plaintext: bytes, context) -> bytes:
     """Rekey captured device facts and update request RI and URL-derived fields.
 
@@ -201,7 +224,7 @@ def refresh_collection(kind: str, plaintext: bytes, context) -> bytes:
     advances the four original SDK counters for another request on the same path.
     Binary layout and known-answer parity are tied to SDK8568.e933698b.
     """
-    from .sap_codec import xxh32, decode_ri
+    from .sap_codec import decode_ri, xxh32
     old, new = context.old_mask, context.new_mask
     if any(not isinstance(key, bytes) or len(key) != 8 for key in (old, new)):
         raise ValueError('Expected eight-byte request masks')

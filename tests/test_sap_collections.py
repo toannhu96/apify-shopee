@@ -4,8 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from shopee_affiliate.sap_collections import (parse_collection,
-    serialize_collection, refresh_collection)
+from shopee_affiliate.sap_collections import (
+    parse_collection,
+    refresh_collection,
+    serialize_collection,
+)
 from shopee_affiliate.sap_refresh import RefreshContext, refresh_root
 
 GOLDEN = json.loads((Path(__file__).parent / 'fixtures/sap_collections_golden.json').read_text())
@@ -75,9 +78,10 @@ def test_unknown_kind_rejected():
     ('sap_collection_token_golden.json', None)])
 def test_consecutive_sdk_signature_counters_match(fixture_name, elapsed):
     from types import SimpleNamespace
+
     from shopee_affiliate.sap_codec import decode_sec
-    from shopee_affiliate.sap_state import decode_payload
     from shopee_affiliate.sap_crypto import decode_collection
+    from shopee_affiliate.sap_state import decode_payload
     fixture = json.loads((Path(__file__).parent / 'fixtures' / fixture_name).read_text())
     before, after = fixture['before_headers'], fixture['target_headers']
     def vectors(headers):
@@ -114,3 +118,33 @@ def test_parser_rejects_nonfinite_float():
     invalid = plain[:5] + bytes.fromhex('7fc00000') + plain[9:]
     with pytest.raises(ValueError, match='finite'):
         parse_collection('custom', invalid)
+
+
+def test_response_completion_only_changes_two_proven_counters():
+    from shopee_affiliate.sap_collections import complete_response_collection
+    sample = GOLDEN[0]
+    mask = bytes.fromhex(sample['mask'])
+    plain = bytes.fromhex(sample['collections']['custom']['plaintext'])
+    fields = parse_collection('custom', plain)
+    completed = parse_collection('custom', complete_response_collection(plain, mask))
+    assert [a['pc'] for a, b in zip(fields, completed) if a != b] == [36428, 37834]
+    assert plain.hex() == sample['collections']['custom']['plaintext']
+
+
+@pytest.mark.parametrize('pc,constant', [(36428, 2441765646), (37834, 4276226149)])
+def test_response_completion_rejects_overflow(pc, constant):
+    from shopee_affiliate.sap_collections import complete_response_collection
+    sample = GOLDEN[0]
+    mask = bytes.fromhex(sample['mask'])
+    fields = parse_collection('custom', bytes.fromhex(sample['collections']['custom']['plaintext']))
+    exhausted = [{**field, 'value': 0xffffffff ^ int.from_bytes(mask[:4], 'little') ^ constant}
+                 if field['pc'] == pc else field for field in fields]
+    with pytest.raises(ValueError, match='overflow'):
+        complete_response_collection(serialize_collection('custom', exhausted), mask)
+
+
+@pytest.mark.parametrize('mask', [b'', bytes(7), '12345678'])
+def test_response_completion_rejects_bad_mask(mask):
+    from shopee_affiliate.sap_collections import complete_response_collection
+    with pytest.raises(ValueError, match='mask'):
+        complete_response_collection(b'', mask)

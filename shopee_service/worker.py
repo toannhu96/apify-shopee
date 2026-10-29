@@ -15,10 +15,20 @@ from shopee_contracts import normalize_output
 
 from .alerts import dispatch_one
 from .config import Settings
-from .repository import Repository
+from .repository import FAILURES, Repository
 from .secrets import Cipher
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _log_failure(phase, error=None):
+    category = getattr(error, 'category', 'invalid_response')
+    category = category if isinstance(category, str) and category in FAILURES | {'input'} else 'invalid_response'
+    status, code = getattr(error, 'http_status', None), getattr(error, 'api_code', None)
+    status = status if type(status) is int and 100 <= status <= 599 else None
+    code = code if type(code) is int and abs(code) < 10**10 else None
+    LOGGER.warning('Shopee failure phase=%s category=%s http_status=%s api_code=%s',
+                   phase, category, status, code)
 
 
 def _fetch(work, fetch):
@@ -32,18 +42,25 @@ def process_one(repo, *, fetch=fetch_signed_product):
         return False
     if not repo.reservation_current(work):
         return True
+    received = False
+    phase = 'job_fetch'
     try:
         response = _fetch(work, fetch)
+        received = True
+        phase = 'job_result'
         result = normalize_output(response['product'], fetched_at=datetime.now(UTC), cache_hit=False)
     except DirectError as error:
+        _log_failure(phase, error)
+        received = received or error.response_received is True
         code = error.category if error.category != 'input' else 'signing'
-        repo.fail_job(work, code)
+        repo.fail_job(work, code, response_received=received)
     except Exception:  # noqa: BLE001 - never leak credentials in third-party errors
         # Response parsing and third-party exceptions must never expose headers,
         # response bodies or proxy URLs in logs.
-        repo.fail_job(work, 'invalid_response')
+        _log_failure(phase)
+        repo.fail_job(work, 'invalid_response', response_received=received)
     else:
-        repo.complete_job(work, result)
+        repo.complete_job(work, result, response_received=received)
     return True
 
 
@@ -51,16 +68,23 @@ def verify_account(repo, alias, item_id, *, fetch=fetch_signed_product):
     work = repo.claim_verification(alias, item_id)
     if work is None or not repo.reservation_current(work):
         return False
+    received = False
+    phase = 'verification_fetch'
     try:
         response = _fetch(work, fetch)
+        received = True
+        phase = 'verification_result'
         normalize_output(response['product'], fetched_at=datetime.now(UTC), cache_hit=False)
     except DirectError as error:
-        repo.fail_verification(work, error.category)
+        _log_failure(phase, error)
+        received = received or error.response_received is True
+        repo.fail_verification(work, error.category, response_received=received)
         return False
     except Exception:  # noqa: BLE001 - never leak credentials in third-party errors
-        repo.fail_verification(work, 'invalid_response')
+        _log_failure(phase)
+        repo.fail_verification(work, 'invalid_response', response_received=received)
         return False
-    return repo.complete_verification(work)
+    return repo.complete_verification(work, response_received=received)
 
 
 def run_loop(repo, settings, stop):

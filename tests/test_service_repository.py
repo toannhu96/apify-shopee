@@ -362,5 +362,63 @@ def test_alert_time_matches_persisted_account_transition(repo):
     work = repo.claim_verification('primary','123',reserve=reserve)
     assert repo.complete_verification(work)
     alert = repo.claim_alert()
-    timestamp = repo.list_accounts()[0]['updated_at'].isoformat()
+    timestamp = repo.list_accounts()[0]['updated_at'].astimezone(UTC).isoformat()
     assert 'Time: ' + timestamp in alert['payload']['content']
+
+
+@pytest.mark.parametrize('verification', [False, True])
+@pytest.mark.parametrize('failure', [False, True])
+@pytest.mark.parametrize('received', [False, True])
+def test_response_history_commits_once_with_fenced_outcome(repo, monkeypatch, verification, failure, received):
+    from unittest.mock import Mock
+
+    from shopee_affiliate import session_signer
+    record = Mock(side_effect=lambda state: {**state, 'completed': state.get('completed', 0) + 1})
+    monkeypatch.setattr(session_signer, 'record_response', record)
+    account(repo)
+    if verification:
+        work = repo.claim_verification('primary', '123', reserve=reserve)
+        complete = lambda: (repo.fail_verification(work, 'verification', response_received=received)
+                           if failure else repo.complete_verification(work, response_received=received))
+    else:
+        repo.submit_run('response-test', ['123'], deadline())
+        work = repo.claim_job(reserve=reserve)
+        complete = lambda: (repo.fail_job(work, 'verification', response_received=received)
+                           if failure else repo.complete_job(work, result(), response_received=received))
+    assert complete() is not False
+    assert complete() is False
+    with repo._tx() as conn:
+        stored = conn.execute('SELECT credentials FROM accounts WHERE alias=%s', ('primary',)).fetchone()
+    state = repo.cipher.decrypt(stored['credentials'])['signing_state']
+    assert state.get('completed', 0) == int(received)
+    assert record.call_count == int(received)
+
+
+def test_response_history_and_job_result_roll_back_together(repo, monkeypatch):
+    from shopee_affiliate import session_signer
+    monkeypatch.setattr(session_signer, 'record_response', lambda state: {**state, 'completed': 1})
+    account(repo)
+    repo.submit_run('response-rollback', ['123'], deadline())
+    work = repo.claim_job(reserve=reserve)
+    monkeypatch.setattr(repo, '_fanout', lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError('fixture')))
+    with pytest.raises(RuntimeError):
+        repo.complete_job(work, result(), response_received=True)
+    with repo._tx() as conn:
+        stored = conn.execute('SELECT credentials,lease_token FROM accounts WHERE alias=%s', ('primary',)).fetchone()
+    assert 'completed' not in repo.cipher.decrypt(stored['credentials'])['signing_state']
+    assert stored['lease_token'] == work.token
+
+
+def test_stale_response_cannot_advance_replacement_session(repo, monkeypatch):
+    from unittest.mock import Mock
+
+    from shopee_affiliate import session_signer
+    record = Mock()
+    monkeypatch.setattr(session_signer, 'record_response', record)
+    account(repo)
+    repo.submit_run('response-stale', ['123'], deadline())
+    work = repo.claim_job(reserve=reserve)
+    repo.replace_account('primary', {'cookie_source': 'new=synthetic', 'signing_state': {'counter': 1}})
+    assert repo.complete_job(work, result(), response_received=True) is False
+    assert repo.fail_job(work, 'verification', response_received=True) is False
+    record.assert_not_called()

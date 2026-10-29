@@ -59,8 +59,9 @@ def _seed(path: str) -> dict:
 
 
 def _initialize(headers: dict) -> dict:
-    from shopee_affiliate.session_signer import initialize_session
-    return initialize_session(headers)
+    from shopee_affiliate.session_signer import initialize_session, record_response
+    # The supplied seed is from an accepted browser request whose response completed.
+    return record_response(initialize_session(headers))
 
 
 def _proxy(path: str | None) -> str | None:
