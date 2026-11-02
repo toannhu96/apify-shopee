@@ -37,8 +37,10 @@ class DirectError(RuntimeError):
     """Safe-to-display error without request secrets or response contents."""
     category = 'invalid_response'
 
-    def __init__(self, message='', *, http_status=None, api_code=None, response_received=False):
+    def __init__(self, message='', *, http_status=None, api_code=None, response_received=False,
+                 response_cookie_source=None):
         super().__init__(message)
+        self.response_cookie_source = response_cookie_source
         self.response_received = response_received is True
         self.http_status = http_status if type(http_status) is int and 100 <= http_status <= 599 else None
         self.api_code = api_code if type(api_code) is int and abs(api_code) < 10**10 else None
@@ -101,6 +103,8 @@ def cookie_header(source: str) -> str:
     URL cookies and domains without a leading dot are host-only. Path ordering
     preserves the browser rule that longer matching paths appear first.
     """
+    if isinstance(source, str) and source.strip() == "[]":
+        raise NoApplicableCookiesError("Shopee session has no usable login cookies")
     target = urlsplit(ENDPOINT)
     now = time.time()
     applicable = []

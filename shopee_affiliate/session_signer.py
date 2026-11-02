@@ -128,6 +128,8 @@ The caller must hold an exclusive, fenced per-account lease and durably store
 the new state before sending the request. Reusing an old reservation is unsafe.
 Managed sessions continue the browser's XHR hook, including its global and
 captured-page request counts. The low-level signer retains standalone mode.
+After handoff, this isolated client produces no browser Performance entries
+or input events. Their per-request deltas are zero, not the seed's old deltas.
 """
     url, now = urlsplit(product_url(item_id)), _clock(now_ms)
     try:
@@ -145,7 +147,8 @@ captured-page request counts. The low-level signer retains standalone mode.
             new_random=secrets.token_bytes(8), raw_url=url.path + '?' + url.query,
             timestamp_ms=now, refresh_collection=refresh_collection, advance_request=True,
             request_rate=60 * total / max(60, elapsed), elapsed_seconds=elapsed,
-            root_request_rate=60 * count / max(60, (now - start) // 1000), advance_xhr=True)
+            root_request_rate=60 * count / max(60, (now - start) // 1000), advance_xhr=True,
+            resource_entry_delta=0, changed_event_types=0)
         fresh = {**headers, **signed, 'af-ac-enc-dat': secrets.token_bytes(8).hex()}
         next_state = {**current, 'headers': dict(fresh), 'last_ms': now, 'path_count': total,
                       'window_started_ms': start, 'window_count': count}

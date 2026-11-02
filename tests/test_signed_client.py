@@ -239,3 +239,57 @@ def test_transport_input_validation_error_is_client_error(monkeypatch):
     with pytest.raises(direct.DirectError, match='request inputs') as caught:
         client.fetch_product(ITEM, seed_headers=SEED, cookie_source=COOKIE, signer=lambda *a: FRESH)
     assert 'secret' not in str(caught.value)
+
+
+@pytest.mark.parametrize('status', [200, 401, 503])
+def test_response_cookies_private_metadata_on_success_and_failure(monkeypatch, status):
+    response = http_transport.HttpResponse(status, json.dumps(PAYLOAD).encode(),
+        ('session=rotated-private; Path=/; Secure',))
+    monkeypatch.setattr(client.http_transport, 'request_product', lambda *a, **kw: response)
+    if status == 200:
+        result = client.fetch_signed_product(ITEM, headers=FRESH, cookie_source=COOKIE)
+        assert isinstance(result, dict)
+        assert 'rotated-private' not in json.dumps(result)
+        assert 'rotated-private' not in repr(result)
+    else:
+        with pytest.raises(direct.DirectError) as caught:
+            client.fetch_signed_product(ITEM, headers=FRESH, cookie_source=COOKIE)
+        result = caught.value
+        assert result.response_received is True
+        assert 'rotated-private' not in repr(result)
+    assert json.loads(result.response_cookie_source)[0]['value'] == 'rotated-private'
+
+
+def test_deleted_cookie_snapshot_stops_next_request_before_signing(monkeypatch):
+    monkeypatch.setattr(client.http_transport, 'request_product', lambda *a, **kw:
+        http_transport.HttpResponse(200, json.dumps(PAYLOAD).encode(), ('session=x; Path=/; Max-Age=0',)))
+    result = client.fetch_signed_product(ITEM, headers=FRESH, cookie_source=COOKIE)
+    assert result.response_cookie_source == '[]'
+    with pytest.raises(direct.DirectAuthenticationError):
+        client.fetch_product(ITEM, seed_headers=SEED, cookie_source=result.response_cookie_source,
+                             signer=lambda *a: pytest.fail('signer called'))
+
+
+def test_timeout_does_not_report_response_cookies(monkeypatch):
+    wire(monkeypatch, failure=http_transport.TransportError('Direct HTTPS request failed'))
+    with pytest.raises(direct.DirectTransientError) as caught:
+        client.fetch_signed_product(ITEM, headers=FRESH, cookie_source=COOKIE)
+    assert caught.value.response_cookie_source is None
+    assert caught.value.response_received is False
+
+
+def test_rotation_used_by_next_request_without_changing_signing_token(monkeypatch):
+    requests = []
+    def request(target, **kwargs):
+        requests.append(kwargs)
+        return http_transport.HttpResponse(200, json.dumps(PAYLOAD).encode(), (
+            'session=new-private; Path=/', 'af-ac-enc-sz-token=cookie-private; Path=/',
+        ) if len(requests) == 1 else ())
+    monkeypatch.setattr(client.http_transport, 'request_product', request)
+    before = dict(FRESH)
+    first = client.fetch_signed_product(ITEM, headers=FRESH, cookie_source=COOKIE)
+    second = client.fetch_signed_product(ITEM, headers=FRESH, cookie_source=first.response_cookie_source)
+    assert requests[1]['cookie'] == 'session=new-private; af-ac-enc-sz-token=cookie-private'
+    assert requests[1]['headers']['af-ac-enc-sz-token'] == FRESH['af-ac-enc-sz-token']
+    assert FRESH == before
+    assert second.response_cookie_source is None

@@ -130,7 +130,13 @@ docker compose run --rm api python -m shopee_service.cli verify-account primary 
 ```
 
 `verify-account` makes one real Shopee request and activates the session only if
-validated product data is returned. Replace an expired session using the same
+validated product data is returned. It also stores that validated, allowlisted
+product in the same 15-minute cache used by the worker, under the verified account
+version. An Actor request for that product can reuse this result without issuing
+an immediate duplicate Shopee request. The result retains its original `fetchedAt`
+and is delivered with `cacheHit: true`. Failed or stale verifications do not write
+cache entries. This reuse does not establish acceptance of later uncached requests.
+Replace an expired session using the same
 protected files with `replace-session primary`; then verify it again. Use
 `disable-account primary` to stop new work on an account. An optional `--proxy-file`
 contains a protected operator-controlled proxy URL; customers cannot supply proxies.
@@ -219,3 +225,68 @@ References: [Actor definitions](https://docs.apify.com/actors/development/actor-
 [event charging](https://docs.apify.com/sdk/python/docs/concepts/pay-per-event),
 [secret environment variables](https://docs.apify.com/actors/development/programming-interface/environment-variables),
 [Store publication](https://docs.apify.com/actors/publishing/publish).
+
+### Refresh from your current Chrome through a local CLI
+
+The local refresh CLI attaches to an already-running Chrome debugging endpoint.
+It opens one temporary product tab in the existing Shopee context, waits for a
+successful normal product response, and captures that request's signing headers
+plus scoped cookies. It closes only its temporary tab. It does not launch Chrome,
+read its profile files, or enable remote debugging. Your current Chrome must
+already expose a loopback CDP endpoint and have a logged-in affiliate tab open.
+A normal Chrome instance without such an endpoint cannot be attached this way.
+
+Install the development requirements on your computer for Playwright. Configure
+an SSH host whose identity is already trusted, and deploy the updated service
+code before running this command. Replace `shopee-server`, `shopee-api`, and
+`primary` with your SSH host, running API container, and existing account alias:
+
+```sh
+.venv/bin/python -m shopee_service.browser_refresh primary \
+  --ssh-target shopee-server --container shopee-api \
+  --cdp-url http://127.0.0.1:9222 --item-id 24995347301 --once
+```
+
+Use `--watch` instead of `--once` to poll account health every 30 seconds. Keep
+this process running on your computer. It refreshes on authentication,
+verification, or pending-session status, with a minimum five-minute cooldown.
+It does not guess a token lifetime from cookie expiration. Rate-limit status
+uses the service's existing cooldown; it does not trigger browser refresh.
+If Shopee asks for login or verification, complete that in Chrome and restart
+the CLI. A rejected replacement or another failure before a healthy poll stops
+the watcher, preventing repeated renewal attempts.
+
+Cookies and headers travel in memory through SSH stdin to the private admin
+command `refresh-session-stdin`. They are not written to files, command arguments,
+logs, Actor inputs, datasets, or the public HTTP API. SSH uses noninteractive
+key authentication and strict host-key checking. The server checks the account
+version captured before browser access, replaces cookies and signing state in
+one transaction, preserves the configured proxy, and fences old workers. It
+waits up to 90 seconds for existing pacing before making one verification lookup.
+Only successful verification activates the account. Longer cooldowns leave it
+pending and stop the CLI; inspect health before retrying.
+
+Apify continues using the private backend, so it needs no browser or Shopee
+cookies. Runs already returned as `session_unavailable` remain finished; submit
+a new run after recovery. Browser success alone does not guarantee that the
+service's network/proxy will be accepted by Shopee.
+
+The signed transport also retains scoped `Set-Cookie` rotation and deletion from
+received responses. The service saves these changes and response signing counters
+atomically under its account lease, including received API rejections. Timeouts
+and stale workers cannot overwrite the stored session. Device-token request
+headers remain separate from cookies because their values can legitimately differ.
+
+For an existing local Docker service, use `--local-container` instead of the
+SSH options. This uses the same private stdin protocol and verification gate:
+
+```sh
+.venv/bin/python -m shopee_service.browser_refresh local-primary \
+  --local-container shopee-local-20261102-api-1 \
+  --cdp-url http://127.0.0.1:9222 --item-id 24995347301 --watch
+```
+
+The watcher process must remain running. It never launches or changes Chrome
+itself. A dedicated Chrome profile with loopback debugging can be started by
+the operator when the normal browser cannot expose a debugging connection;
+sign in to Shopee in that profile before starting the watcher.

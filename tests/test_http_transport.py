@@ -13,7 +13,7 @@ HEADERS = {'accept': 'application/json', 'affiliate-program-type': '1',
 COOKIE = 'duplicate=path; duplicate=root; session=synthetic=='
 
 
-def mock_session(monkeypatch, *, chunks=(b'{"code":', b'0}'), status=200, failure=None):
+def mock_session(monkeypatch, *, chunks=(b'{"code":', b'0}'), status=200, failure=None, response_headers=None):
     calls = []
 
     class Session:
@@ -32,7 +32,7 @@ def mock_session(monkeypatch, *, chunks=(b'{"code":', b'0}'), status=200, failur
                 raise failure
             for chunk in chunks:
                 assert kwargs['content_callback'](chunk) == len(chunk)
-            return SimpleNamespace(status_code=status)
+            return SimpleNamespace(status_code=status, headers=response_headers)
 
     monkeypatch.setattr(transport, '_load_requests', lambda: SimpleNamespace(Session=Session))
     return calls
@@ -203,3 +203,23 @@ def test_many_small_chunks_have_linear_buffering(monkeypatch):
     mock_session(monkeypatch, chunks=(b'x' for _ in range(100000)))
     result = transport.request_product(ITEM, headers=HEADERS, cookie=COOKIE)
     assert result.body == b'x' * 100000
+
+
+def test_transport_preserves_separate_set_cookie_headers(monkeypatch):
+    from curl_cffi.requests.headers import Headers
+    headers = Headers([
+        ('Set-Cookie', 'session=private-rotated; Expires=Wed, 21 Oct 2037 07:28:00 GMT; Path=/'),
+        ('Set-Cookie', 'other=private-second; Path=/api'),
+    ])
+    mock_session(monkeypatch, response_headers=headers)
+    result = transport.request_product(ITEM, headers=HEADERS, cookie=COOKIE)
+    assert result.set_cookie_headers == tuple(headers.get_list('set-cookie'))
+    assert len(result.set_cookie_headers) == 2
+    assert 'private-' not in repr(result)
+
+
+@pytest.mark.parametrize('headers', [('s=x',) * 65, ('s=' + 'secret' * 2000,), ('s=secret\r\nx=y',)])
+def test_response_dataclass_rejects_unbounded_headers(headers):
+    with pytest.raises(ValueError) as caught:
+        transport.HttpResponse(200, b'{}', headers)
+    assert 'secret' not in str(caught.value)

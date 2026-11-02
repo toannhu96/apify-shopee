@@ -23,7 +23,7 @@ from shopee_affiliate import session_signer
 from shopee_service.api import create_app
 from shopee_service.repository import Repository
 from shopee_service.secrets import Cipher
-from shopee_service.worker import process_one
+from shopee_service.worker import process_one, verify_account
 
 
 @pytest.fixture
@@ -122,6 +122,48 @@ def test_worker_delivery_billing_and_cached_second_run(managed):
     assert len(second.charges) == 2
     with managed._tx() as conn:
         assert conn.execute('SELECT count(*) AS n FROM deliveries WHERE phase=\'charged\'').fetchone()['n'] == 4
+
+
+def test_rotated_response_cookies_reach_next_uncached_request_only(managed, monkeypatch):
+    original_fetch = fetch
+    seen = []
+
+    class Response(dict):
+        response_cookie_source = 'session=private-rotation-fixture'
+
+    def rotate(item, **kwargs):
+        seen.append(kwargs['cookie_source'])
+        return Response(original_fetch(item))
+
+    monkeypatch.setattr(sys.modules[__name__], 'fetch', rotate)
+    first, summary = run_actor(managed, ['123'], run_id='rotate-first')
+    assert summary['status'] == 'succeeded'
+    second, summary = run_actor(managed, ['123', '456'], run_id='rotate-second')
+    assert summary['status'] == 'succeeded'
+    assert [row['cacheHit'] for row in second.rows] == [True, False]
+    assert seen[0] == 'session=synthetic'
+    assert json.loads(seen[1])[0]['value'] == 'private-rotation-fixture'
+    assert len(seen) == 2
+    with managed._tx() as conn:
+        cached = conn.execute('SELECT result FROM product_cache').fetchall()
+    public = json.dumps([first.rows, second.rows, first.summary, second.summary, cached])
+    assert 'private-rotation-fixture' not in public
+    assert 'response_cookie_source' not in public
+
+
+def test_actor_delivers_verified_product_without_second_upstream_request(managed, monkeypatch):
+    assert verify_account(managed, 'test', '123', fetch=fetch)
+    with managed._tx() as conn:
+        verified = conn.execute("SELECT result FROM product_cache WHERE item_id='123'").fetchone()['result']
+    def unexpected_fetch(*_args, **_kwargs):
+        pytest.fail('A just-verified product must not require another upstream request')
+    monkeypatch.setattr(sys.modules[__name__], 'fetch', unexpected_fetch)
+    port, summary = run_actor(managed, ['123'], run_id='verified-product')
+    assert summary['status'] == 'succeeded' and summary['deliveredCount'] == 1
+    assert len(port.rows) == len(port.charges) == 1
+    assert port.rows[0]['cacheHit'] is True
+    assert port.rows[0]['fetchedAt'] == verified['fetchedAt']
+    assert 'must-not-leak' not in str(port.rows)
 
 
 def test_restarted_actor_uses_real_ledger_without_duplicate_charge(managed):

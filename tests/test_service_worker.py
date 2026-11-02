@@ -41,16 +41,24 @@ def test_invalid_output_and_unexpected_exception_fail_safely():
     assert repo.fail_job.call_args.args[1] == 'invalid_response'
 
 
-def test_verify_never_stores_product():
+def test_verify_persists_only_allowlisted_product_with_account_activation():
     repo = Mock()
     repo.claim_verification.return_value = work()
     repo.complete_verification.return_value = True
-    assert verify_account(repo, 'primary', '123', fetch=Mock(return_value={'product':{'item_id':'123'}}))
+    assert verify_account(repo, 'primary', '123', fetch=Mock(return_value={
+        'product': {'item_id': '123', 'name': 'Verified', 'affiliate_link': 'private'},
+        'raw': {'private': 'must-not-leak'}}))
+    saved = repo.complete_verification.call_args.args[1]
+    assert saved['item_id'] == '123' and saved['cacheHit'] is False
+    assert 'affiliate_link' not in saved and 'raw' not in saved
+    datetime.fromisoformat(saved['fetchedAt'])
     repo.complete_job.assert_not_called()
     repo.claim_verification.return_value = None
     assert verify_account(repo,'primary','123',fetch=Mock()) is False
     repo.claim_verification.return_value = work()
+    repo.complete_verification.reset_mock()
     assert verify_account(repo,'primary','123',fetch=Mock(side_effect=DirectAuthenticationError('secret'))) is False
+    repo.complete_verification.assert_not_called()
     repo.fail_verification.assert_called_with(work(),'authentication', response_received=False)
 
 

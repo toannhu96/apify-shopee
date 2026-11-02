@@ -75,6 +75,8 @@ class RefreshContext:
     elapsed_seconds: int | None = None
     root_request_rate: float | None = None
     advance_xhr: bool = False
+    resource_entry_delta: int | None = None
+    changed_event_types: int | None = None
 
 
 def _refresh_vectors(old, context, refresh_collection, detector_padding):
@@ -157,7 +159,9 @@ def refresh_root(old_sec: str, old_ri: str, new_ri: str, *, new_mask: bytes,
                  detector_padding: bytes | None = None, advance_request: bool = False,
                  request_rate: float | None = None, elapsed_seconds: int | None = None,
                  root_request_rate: float | None = None,
-                 advance_xhr: bool = False) -> dict[str, str]:
+                 advance_xhr: bool = False,
+                 resource_entry_delta: int | None = None,
+                 changed_event_types: int | None = None) -> dict[str, str]:
     """Assemble a refreshed root using a required semantic collection callback.
 
     Callback receives kind ('custom'/'salsa'), verified decrypted plaintext and
@@ -169,6 +173,10 @@ def refresh_root(old_sec: str, old_ri: str, new_ri: str, *, new_mask: bytes,
     advance_xhr models fully initialized SDK7116 XHR hooks: initialized signing
     count, total XHR count and requests from the captured page. Standalone
     generateSignEntry omits this lifecycle.
+    Explicit resource_entry_delta and changed_event_types replace the per-path
+    performance-entry delta and number of changed event-count types. None keeps
+    the captured values; these overrides require advance_request=True.
+    Same-path resource_entry_delta also advances the absolute entry count.
     This low-level API accepts explicit masks for SDK parity tests; its caller
     must enforce agreement between mask time, RI time and timestamp_ms.
     """
@@ -182,7 +190,8 @@ def refresh_root(old_sec: str, old_ri: str, new_ri: str, *, new_mask: bytes,
     old = decode_payload(decode_sec(old_sec, old_ri).payload, old_ri)
     context = RefreshContext(bytes.fromhex(old['vectors'][1]['hex']), new_mask,
         bytes.fromhex(old['vectors'][14]['hex']), new_random, raw_url, timestamp_ms, old_ri, new_ri,
-        advance_request, request_rate, elapsed_seconds, root_request_rate, advance_xhr)
+        advance_request, request_rate, elapsed_seconds, root_request_rate, advance_xhr,
+        resource_entry_delta, changed_event_types)
     vectors = _refresh_vectors(old, context, refresh_collection, detector_padding)
     fields = _refresh_fields(old, context, vectors)
     payload = build_payload(vectors, fields, rotation=derive_slot_rotation(new_ri),

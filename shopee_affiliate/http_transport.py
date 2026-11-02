@@ -15,6 +15,8 @@ from importlib import import_module
 from io import BytesIO
 from urllib.parse import unquote, urlsplit
 
+from .response_cookies import bounded_set_cookie_headers
+
 ENDPOINT = 'https://affiliate.shopee.vn/api/v3/offer/product'
 PRODUCT_ID = r'[1-9][0-9]{0,19}'
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
@@ -42,6 +44,10 @@ class TransportError(RuntimeError):
 class HttpResponse:
     status: int
     body: bytes = field(repr=False)
+    set_cookie_headers: tuple[str, ...] = field(default=(), repr=False)
+
+    def __post_init__(self):
+        object.__setattr__(self, "set_cookie_headers", bounded_set_cookie_headers(self.set_cookie_headers))
 
 
 def product_url(target: str | int) -> str:
@@ -140,7 +146,13 @@ def request_product(target: str | int, *, headers: Mapping[str, str], cookie: st
             raise TransportError('Response exceeds the size limit', category='invalid_response')
         if type(response.status_code) is not int or not 100 <= response.status_code <= 599:
             raise TransportError('Invalid HTTP status', category='invalid_response')
-        return HttpResponse(response.status_code, buffer.getvalue())
+        response_headers = getattr(response, 'headers', None)
+        cookie_headers = () if response_headers is None else response_headers.get_list('set-cookie')
+        try:
+            cookie_headers = bounded_set_cookie_headers(cookie_headers)
+        except ValueError:
+            raise TransportError('Invalid response cookie headers', category='invalid_response') from None
+        return HttpResponse(response.status_code, buffer.getvalue(), cookie_headers)
     except Exception as error:  # noqa: BLE001 - transport exceptions may contain credentials
         message = 'Response exceeds the size limit' if too_large else 'Direct HTTPS request failed'
         category = 'invalid_response' if too_large else getattr(error, 'category', 'transient')

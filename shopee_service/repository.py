@@ -196,17 +196,30 @@ class Repository:
                 self._stop_items(conn, run_id, reason)
             return self._snapshot(conn, run_id, 0, 100)
 
-    def replace_account(self, alias, credentials, *, create_only=False, require_existing=False):
+    def replace_account(self, alias, credentials, *, create_only=False, require_existing=False,
+                        expected_version=None, preserve_proxy=False, require_enabled=False):
         _id(alias, ALIAS)
         if type(create_only) is not bool or type(require_existing) is not bool or (create_only and require_existing):
             raise ValueError('Invalid account replacement mode')
-        encrypted = self.cipher.encrypt(credentials)
+        if (type(preserve_proxy) is not bool or type(require_enabled) is not bool
+                or (create_only and require_enabled) or (expected_version is not None
+                and (type(expected_version) is not int or expected_version < 1 or create_only))):
+            raise ValueError('Invalid account replacement mode')
         with self._tx() as conn:
-            exists = conn.execute('SELECT 1 FROM accounts WHERE alias=%s FOR UPDATE', (alias,)).fetchone()
+            exists = conn.execute('SELECT version,status,credentials FROM accounts WHERE alias=%s FOR UPDATE', (alias,)).fetchone()
             if create_only and exists:
                 raise Conflict('Account alias already exists')
-            if require_existing and not exists:
+            if (require_existing or expected_version is not None or preserve_proxy or require_enabled) and not exists:
                 raise Missing('Account alias does not exist')
+            if expected_version is not None and exists['version'] != expected_version:
+                raise Conflict('Account session changed during refresh')
+            if require_enabled and exists['status'] == 'disabled':
+                raise Conflict('Account was disabled during refresh')
+            updated = credentials
+            if preserve_proxy:
+                current = self.cipher.decrypt(exists['credentials'])
+                updated = {**credentials, 'proxy_url': current.get('proxy_url')}
+            encrypted = self.cipher.encrypt(updated)
             row = conn.execute("INSERT INTO accounts(alias,status,credentials) VALUES(%s,'pending',%s) "
                                "ON CONFLICT(alias) DO UPDATE SET version=accounts.version+1,status='pending',"
                                "credentials=EXCLUDED.credentials,updated_at=now(),next_request_at=GREATEST(accounts.next_request_at,accounts.lease_until,now()),lease_token=NULL,lease_until=NULL "
@@ -308,27 +321,33 @@ class Repository:
         conn.execute('UPDATE accounts SET lease_token=NULL,lease_until=NULL WHERE alias=%s AND lease_token=%s',
                      (work.account_alias, work.token))
 
-    def _record_response(self, conn, work):
-        """Advance completed-response counters inside the fenced outcome transaction."""
+    def _record_response(self, conn, work, response_cookie_source=None):
+        """Commit response cookies and counters inside the fenced outcome transaction."""
+        from shopee_affiliate.response_cookies import validate_response_cookie_source
         from shopee_affiliate.session_signer import record_response
         row = conn.execute('SELECT credentials FROM accounts WHERE alias=%s', (work.account_alias,)).fetchone()
         credentials = self.cipher.decrypt(row['credentials'])
         updated = {**credentials, 'signing_state': record_response(credentials['signing_state'])}
+        if response_cookie_source is not None:
+            updated = {**updated, 'cookie_source': validate_response_cookie_source(response_cookie_source)}
         conn.execute('UPDATE accounts SET credentials=%s WHERE alias=%s',
                      (self.cipher.encrypt(updated), work.account_alias))
 
-    def complete_job(self, work, result, *, response_received=False):
+    def _cache_product(self, conn, work, result):
+        conn.execute('INSERT INTO product_cache(item_id,account_alias,account_version,result,expires_at) '
+                     "VALUES(%s,%s,%s,%s,now()+interval '15 minutes') ON CONFLICT(item_id) DO UPDATE SET "
+                     'account_alias=EXCLUDED.account_alias,account_version=EXCLUDED.account_version,result=EXCLUDED.result,'
+                     'expires_at=EXCLUDED.expires_at,created_at=now()',
+                     (work.item_id, work.account_alias, work.account_version, Jsonb(result)))
+
+    def complete_job(self, work, result, *, response_received=False, response_cookie_source=None):
         with self._tx() as conn:
             self._maintenance(conn)
             if not self._current(conn, work):
                 return False
             if response_received is True:
-                self._record_response(conn, work)
-            conn.execute('INSERT INTO product_cache(item_id,account_alias,account_version,result,expires_at) '
-                         "VALUES(%s,%s,%s,%s,now()+interval '15 minutes') ON CONFLICT(item_id) DO UPDATE SET "
-                         'account_alias=EXCLUDED.account_alias,account_version=EXCLUDED.account_version,result=EXCLUDED.result,'
-                         'expires_at=EXCLUDED.expires_at,created_at=now()',
-                         (work.item_id, work.account_alias, work.account_version, Jsonb(result)))
+                self._record_response(conn, work, response_cookie_source)
+            self._cache_product(conn, work, result)
             self._fanout(conn, work.item_id, 'succeeded', result=result)
             conn.execute('DELETE FROM jobs WHERE item_id=%s', (work.item_id,))
             self._release(conn, work)
@@ -353,14 +372,14 @@ class Repository:
         self._alert(conn, f'{alias}:{row["version"]}:{row["incident"]}:{status}',
                     f'Shopee account {alias}: {status}. {action}', row['updated_at'])
 
-    def fail_job(self, work, code, *, response_received=False):
+    def fail_job(self, work, code, *, response_received=False, response_cookie_source=None):
         code = code if code in FAILURES else 'invalid_response'
         with self._tx() as conn:
             self._maintenance(conn)
             if not self._current(conn, work):
                 return False
             if response_received is True:
-                self._record_response(conn, work)
+                self._record_response(conn, work, response_cookie_source)
             self._release(conn, work)
             if code in ('authentication', 'verification', 'signing', 'rate_limit'):
                 self._incident(conn, work.account_alias, code)
@@ -397,24 +416,27 @@ class Repository:
                 LOGGER.warning('Shopee failure phase=verification_reservation category=signing')
                 raise
 
-    def complete_verification(self, work, *, response_received=False):
+    def complete_verification(self, work, result=None, *, response_received=False, response_cookie_source=None):
+        """Activate a current session and retain its validated product for later runs."""
         with self._tx() as conn:
             if not self._current(conn, work):
                 return False
             if response_received is True:
-                self._record_response(conn, work)
+                self._record_response(conn, work, response_cookie_source)
+            if result is not None:
+                self._cache_product(conn, work, result)
             row = conn.execute("UPDATE accounts SET status='healthy',updated_at=now() WHERE alias=%s RETURNING updated_at", (work.account_alias,)).fetchone()
             self._release(conn, work)
             self._alert(conn, f'{work.account_alias}:{work.account_version}:recovery',
                         f'Shopee account {work.account_alias}: session validated and available.', row['updated_at'])
             return True
 
-    def fail_verification(self, work, code, *, response_received=False):
+    def fail_verification(self, work, code, *, response_received=False, response_cookie_source=None):
         with self._tx() as conn:
             if not self._current(conn, work):
                 return False
             if response_received is True:
-                self._record_response(conn, work)
+                self._record_response(conn, work, response_cookie_source)
             self._release(conn, work)
             if code in ('authentication', 'verification', 'signing', 'rate_limit'):
                 self._incident(conn, work.account_alias, code)

@@ -238,3 +238,24 @@ def test_managed_requests_match_five_original_sdk_xhr_lifecycles(monkeypatch):
         monkeypatch.setattr(signer.secrets, 'token_bytes', lambda count, entropy=entropy: next(entropy))
         fresh, state = signer.reserve_request('26609048170', state, now_ms=target['timestamp_ms'])
         assert {k: fresh[k] for k in target_headers} == target_headers
+
+
+def test_managed_handoff_does_not_repeat_browser_activity_deltas():
+    from shopee_affiliate.sap_collections import parse_collection
+
+    reference = fixture('sap_collector_deltas_golden.json')['samples'][0]['headers']
+    state = signer.initialize_session(headers(reference), now_ms=1800000000000)
+    original = copy.deepcopy(state)
+    for now in (1800000001000, 1800000002000):
+        fresh, state = signer.reserve_request('52253929694', state, now_ms=now)
+        raw, _ = decoded(fresh)
+        vectors = [bytes.fromhex(v['hex']) for v in raw['vectors']]
+        mask = int.from_bytes(vectors[1][:4], 'little')
+        custom = {v['pc']: v['value'] for v in parse_collection('custom',
+            decode_collection(vectors[12], vectors[13], 'custom', vectors[1], vectors[14]))}
+        salsa = {v['pc']: v['value'] for v in parse_collection('salsa',
+            decode_collection(vectors[15], vectors[11], 'salsa', vectors[1], vectors[14]))}
+        assert custom[38475] ^ mask ^ 1348351202 == 0
+        assert custom[38393] ^ mask ^ 1810204798 == 0
+        assert salsa[45351] ^ mask ^ 1234494780 == 9
+    assert original['headers'] == headers(reference)

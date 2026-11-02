@@ -217,6 +217,50 @@ def test_database_lock_serializes_concurrent_claims(repo):
     assert sum(claim is not None for claim in claims) == 1
 
 
+def test_verified_product_is_cached_with_original_fetch_time_and_session_version(repo):
+    repo.replace_account('primary', {'cookie_source': 'synthetic=1', 'signing_state': {'counter': 1}})
+    work = repo.claim_verification('primary', '123', reserve=reserve)
+    verified = result()
+    assert repo.complete_verification(work, verified)
+    snapshot = repo.submit_run('verified', ['123'], deadline())
+    assert snapshot['done'] and snapshot['counts']['succeeded'] == 1
+    assert snapshot['results'][0]['result'] == {**verified, 'cacheHit': True}
+    assert repo.claim_job(reserve=reserve) is None
+    with repo._tx() as conn:
+        cached = conn.execute('SELECT * FROM product_cache WHERE item_id=%s', ('123',)).fetchone()
+        assert cached['account_version'] == work.account_version
+        assert 899 <= (cached['expires_at'] - cached['created_at']).total_seconds() <= 900
+    repo.replace_account('primary', {'cookie_source': 'new=synthetic', 'signing_state': {'counter': 1}})
+    replaced = repo.submit_run('replaced', ['123'], deadline())
+    assert replaced['results'][0]['errorCode'] == 'session_unavailable'
+
+
+@pytest.mark.parametrize('invalidated', ['expired', 'replaced', 'disabled'])
+def test_stale_verification_cannot_cache_product(repo, invalidated):
+    credentials = {'cookie_source': 'synthetic=1', 'signing_state': {'counter': 1}}
+    repo.replace_account('primary', credentials)
+    work = repo.claim_verification('primary', '123', reserve=reserve)
+    if invalidated == 'replaced':
+        repo.replace_account('primary', credentials)
+    elif invalidated == 'disabled':
+        repo.disable_account('primary')
+    else:
+        with repo._tx() as conn:
+            conn.execute("UPDATE accounts SET lease_until=now()-interval '1 second'")
+    assert repo.complete_verification(work, result()) is False
+    with repo._tx() as conn:
+        assert conn.execute('SELECT count(*) AS n FROM product_cache').fetchone()['n'] == 0
+
+
+def test_failed_verification_does_not_create_cached_product(repo):
+    repo.replace_account('primary', {'cookie_source': 'synthetic=1', 'signing_state': {'counter': 1}})
+    work = repo.claim_verification('primary', '123', reserve=reserve)
+    assert repo.fail_verification(work, 'verification')
+    with repo._tx() as conn:
+        assert conn.execute('SELECT count(*) AS n FROM product_cache').fetchone()['n'] == 0
+    assert repo.submit_run('failed', ['123'], deadline())['results'][0]['errorCode'] == 'session_unavailable'
+
+
 def test_pending_account_verification_fencing_and_recovery_alert(repo):
     version = repo.replace_account('primary', {'cookie_source':'synthetic=1', 'signing_state':{'counter':1},'proxy_url':None})
     assert version == 1
@@ -402,10 +446,11 @@ def test_response_history_and_job_result_roll_back_together(repo, monkeypatch):
     work = repo.claim_job(reserve=reserve)
     monkeypatch.setattr(repo, '_fanout', lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError('fixture')))
     with pytest.raises(RuntimeError):
-        repo.complete_job(work, result(), response_received=True)
+        repo.complete_job(work, result(), response_received=True, response_cookie_source='session=rotated-secret')
     with repo._tx() as conn:
         stored = conn.execute('SELECT credentials,lease_token FROM accounts WHERE alias=%s', ('primary',)).fetchone()
     assert 'completed' not in repo.cipher.decrypt(stored['credentials'])['signing_state']
+    assert repo.cipher.decrypt(stored['credentials'])['cookie_source'] == 'session=synthetic'
     assert stored['lease_token'] == work.token
 
 
@@ -422,3 +467,165 @@ def test_stale_response_cannot_advance_replacement_session(repo, monkeypatch):
     assert repo.complete_job(work, result(), response_received=True) is False
     assert repo.fail_job(work, 'verification', response_received=True) is False
     record.assert_not_called()
+
+
+@pytest.mark.parametrize('verification', [False, True])
+@pytest.mark.parametrize('failure', [False, True])
+@pytest.mark.parametrize('received', [False, True])
+def test_response_cookies_commit_with_counters_once(repo, monkeypatch, verification, failure, received):
+    import json
+
+    from shopee_affiliate import session_signer
+    monkeypatch.setattr(session_signer, 'record_response', lambda state: {**state, 'completed': 1})
+    account(repo)
+    if verification:
+        work = repo.claim_verification('primary', '123', reserve=reserve)
+    else:
+        repo.submit_run('cookie-response', ['123'], deadline())
+        work = repo.claim_job(reserve=reserve)
+    kwargs = {'response_received': received, 'response_cookie_source': 'session=rotated-secret'}
+    if verification:
+        finish = lambda: (repo.fail_verification(work, 'invalid_response', **kwargs)
+                          if failure else repo.complete_verification(work, **kwargs))
+    else:
+        finish = lambda: (repo.fail_job(work, 'invalid_response', **kwargs)
+                          if failure else repo.complete_job(work, result(), **kwargs))
+    assert finish() is True
+    assert finish() is False
+    with repo._tx() as conn:
+        stored = conn.execute("SELECT credentials FROM accounts WHERE alias='primary'").fetchone()
+        conn.execute('UPDATE accounts SET next_request_at=now()')
+    credentials = repo.cipher.decrypt(stored['credentials'])
+    assert credentials['signing_state'] == {'counter': 2, **({'completed': 1} if received else {})}
+    if received:
+        assert json.loads(credentials['cookie_source'])[0]['value'] == 'rotated-secret'
+    else:
+        assert credentials['cookie_source'] == 'session=synthetic'
+    next_work = repo.claim_verification('primary', '456', reserve=reserve)
+    assert next_work.cookie_source == credentials['cookie_source']
+
+
+@pytest.mark.parametrize('source', ['[]', 'bad-secret\r\nheader=1'])
+def test_empty_cookie_deletion_is_valid_but_malformed_source_rolls_back(repo, monkeypatch, source):
+    from shopee_affiliate import session_signer
+    monkeypatch.setattr(session_signer, 'record_response', lambda state: {**state, 'completed': 1})
+    account(repo)
+    repo.submit_run('cookie-validation', ['123'], deadline())
+    work = repo.claim_job(reserve=reserve)
+    if source == '[]':
+        assert repo.complete_job(work, result(), response_received=True, response_cookie_source=source)
+    else:
+        with pytest.raises(ValueError) as error:
+            repo.complete_job(work, result(), response_received=True, response_cookie_source=source)
+        assert 'bad-secret' not in str(error.value)
+    with repo._tx() as conn:
+        stored = conn.execute("SELECT credentials,lease_token FROM accounts WHERE alias='primary'").fetchone()
+    credentials = repo.cipher.decrypt(stored['credentials'])
+    if source == '[]':
+        assert credentials['cookie_source'] == '[]'
+        assert credentials['signing_state']['completed'] == 1
+    else:
+        assert credentials['cookie_source'] == 'session=synthetic'
+        assert 'completed' not in credentials['signing_state']
+        assert stored['lease_token'] == work.token
+
+
+@pytest.mark.parametrize('verification', [False, True])
+def test_stale_cookie_response_cannot_replace_new_session(repo, monkeypatch, verification):
+    from shopee_affiliate import session_signer
+    monkeypatch.setattr(session_signer, 'record_response', lambda state: pytest.fail('Stale work must not record a response'))
+    account(repo)
+    if verification:
+        work = repo.claim_verification('primary', '123', reserve=reserve)
+    else:
+        repo.submit_run('cookie-stale', ['123'], deadline())
+        work = repo.claim_job(reserve=reserve)
+    replacement = {'cookie_source': 'new=synthetic', 'signing_state': {'counter': 9}}
+    repo.replace_account('primary', replacement)
+    complete = repo.complete_verification if verification else repo.complete_job
+    fail = repo.fail_verification if verification else repo.fail_job
+    for method, argument in [(complete, result()), (fail, 'verification')]:
+        assert method(work, argument, response_received=True, response_cookie_source='stale=secret') is False
+    with repo._tx() as conn:
+        stored = conn.execute("SELECT credentials FROM accounts WHERE alias='primary'").fetchone()
+    assert repo.cipher.decrypt(stored['credentials']) == replacement
+
+
+def test_account_refresh_compare_and_swap_preserves_proxy_and_rejects_stale_capture(repo):
+    original = {'cookie_source': 'old=synthetic', 'signing_state': {'counter': 1}, 'proxy_url': 'http://synthetic.test:8080'}
+    fresh = {'cookie_source': 'fresh=synthetic', 'signing_state': {'counter': 9}}
+    repo.replace_account('primary', original)
+    assert repo.replace_account('primary', fresh, expected_version=1, preserve_proxy=True) == 2
+    with pytest.raises(Conflict):
+        repo.replace_account('primary', original, expected_version=1, preserve_proxy=True)
+    with pytest.raises(Missing):
+        repo.replace_account('absent', fresh, expected_version=1, preserve_proxy=True)
+    for invalid in (0, -1, True, 1.5, '1'):
+        with pytest.raises(ValueError):
+            repo.replace_account('primary', original, expected_version=invalid)
+    with repo._tx() as conn:
+        stored = conn.execute("SELECT version,credentials FROM accounts WHERE alias='primary'").fetchone()
+    assert stored['version'] == 2
+    assert repo.cipher.decrypt(stored['credentials']) == {**fresh, 'proxy_url': original['proxy_url']}
+
+
+def test_simultaneous_refreshes_cannot_overwrite_winning_session(repo):
+    from concurrent.futures import ThreadPoolExecutor
+    account(repo)
+
+    def refresh(index):
+        try:
+            return repo.replace_account('primary', {'cookie_source': f'synthetic={index}',
+                'signing_state': {'counter': index}}, expected_version=1, preserve_proxy=True)
+        except Conflict:
+            return 'conflict'
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        outcomes = list(executor.map(refresh, [7, 8]))
+    assert sorted(outcomes, key=str) == [2, 'conflict']
+    winner = 7 if outcomes[0] == 2 else 8
+    with repo._tx() as conn:
+        stored = conn.execute("SELECT credentials FROM accounts WHERE alias='primary'").fetchone()
+    assert repo.cipher.decrypt(stored['credentials'])['signing_state']['counter'] == winner
+
+
+def test_refresh_does_not_reenable_account_disabled_after_capture(repo):
+    account(repo)
+    captured_version = repo.list_accounts()[0]['version']
+    repo.disable_account('primary')
+    fresh = {'cookie_source': 'fresh=synthetic', 'signing_state': {'counter': 9}}
+    with pytest.raises(Conflict):
+        repo.replace_account('primary', fresh, expected_version=captured_version,
+                             preserve_proxy=True, require_enabled=True)
+    with repo._tx() as conn:
+        stored = conn.execute("SELECT version,status,credentials FROM accounts WHERE alias='primary'").fetchone()
+    assert stored['status'] == 'disabled' and stored['version'] == captured_version
+    assert repo.cipher.decrypt(stored['credentials'])['cookie_source'] == 'session=synthetic'
+    # Explicit manual replacement retains its existing reactivation semantics.
+    assert repo.replace_account('primary', fresh, expected_version=captured_version) == captured_version + 1
+
+
+def test_concurrent_disable_wins_over_automatic_refresh(repo):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    account(repo)
+    barrier = Barrier(2)
+
+    def refresh():
+        barrier.wait(timeout=5)
+        try:
+            return repo.replace_account('primary', {'cookie_source': 'fresh=synthetic',
+                'signing_state': {'counter': 9}}, expected_version=1, require_enabled=True)
+        except Conflict:
+            return 'conflict'
+
+    def disable():
+        barrier.wait(timeout=5)
+        repo.disable_account('primary')
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        refresh_future = executor.submit(refresh)
+        disable_future = executor.submit(disable)
+        assert refresh_future.result() in (2, 'conflict')
+        disable_future.result()
+    assert repo.list_accounts()[0]['status'] == 'disabled'

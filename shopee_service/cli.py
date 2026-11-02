@@ -7,6 +7,8 @@ import os
 import re
 import stat
 import sys
+import time
+from datetime import UTC, datetime
 from urllib.parse import urlsplit
 
 from .config import Settings
@@ -99,6 +101,58 @@ def _repository():
                       lease_seconds=settings.lease_seconds)
 
 
+def _stdin_credentials() -> dict:
+    from shopee_affiliate import signed_client
+    maximum = 2 * signed_client.MAX_COOKIE_INPUT_BYTES
+    try:
+        raw = sys.stdin.buffer.read(maximum + 1)
+        if len(raw) > maximum:
+            raise ValueError()
+        value = json.loads(raw.decode('utf-8'), object_pairs_hook=signed_client._pairs,
+                           parse_constant=signed_client._constant,
+                           parse_float=signed_client._finite_float)
+        if not isinstance(value, dict) or set(value) != {'cookie_source', 'headers'}:
+            raise ValueError()
+        signed_client._cookie_header(value['cookie_source'])
+        headers = signed_client._normalized_headers(value['headers'])
+        return {'cookie_source': value['cookie_source'], 'signing_state': _initialize(headers)}
+    except Exception:  # noqa: BLE001 - untrusted credential input must never appear in errors
+        raise OperatorError('Session handoff is invalid or exceeds the size limit') from None
+
+
+def _version(value: str) -> int:
+    if not re.fullmatch(r'[1-9][0-9]{0,9}', value):
+        raise argparse.ArgumentTypeError('Expected version must be a positive integer')
+    return int(value)
+
+
+def _refresh_stdin(args, repo):
+    version = repo.replace_account(args.alias, _stdin_credentials(), require_existing=True,
+                                   expected_version=args.expected_version, preserve_proxy=True, require_enabled=True)
+    ready = _wait_for_verification(repo, args.alias, version)
+    accepted = ready and _verify(repo, args.alias, args.item_id)
+    row = next((row for row in repo.list_accounts() if row['alias'] == args.alias), {})
+    status = row.get('status', 'unavailable')
+    verified = accepted is True and row.get('version') == version and status == 'healthy'
+    print(json.dumps({'alias': args.alias, 'version': version, 'status': status, 'verified': verified}))
+
+
+def _wait_for_verification(repo, alias, version):
+    deadline = time.monotonic() + 90
+    while True:
+        row = next((row for row in repo.list_accounts() if row['alias'] == alias), {})
+        if row.get('version') != version or row.get('status') != 'pending':
+            return False
+        due = row.get('next_request_at')
+        delay = max(0, (due - datetime.now(UTC)).total_seconds()) if due else 0
+        if delay == 0:
+            return True
+        remaining = deadline - time.monotonic()
+        if remaining <= 0 or delay > remaining:
+            return False
+        time.sleep(min(delay, 1))
+
+
 def _verify(repo, alias: str, item_id: str) -> bool:
     from .worker import verify_account
     return verify_account(repo, alias, item_id)
@@ -124,6 +178,10 @@ def _parser() -> argparse.ArgumentParser:
     verify = commands.add_parser('verify-account', help='Make one live lookup to validate and activate a session')
     verify.add_argument('alias', type=_alias)
     verify.add_argument('--item-id', type=_item, required=True)
+    refresh = commands.add_parser('refresh-session-stdin', help='Receive a private bounded session over stdin and verify once')
+    refresh.add_argument('alias', type=_alias)
+    refresh.add_argument('--expected-version', type=_version, required=True)
+    refresh.add_argument('--item-id', type=_item, required=True)
     return parser
 
 
@@ -150,6 +208,8 @@ def _run(args, repo) -> int:
         if not _verify(repo, args.alias, args.item_id):
             raise OperatorError('Account verification did not succeed; inspect the account health and retry after resolving it')
         print(f'Account {args.alias} verified and activated.')
+    elif args.command == 'refresh-session-stdin':
+        _refresh_stdin(args, repo)
     else:
         if args.command == 'add-account' and any(row.get('alias') == args.alias for row in repo.list_accounts()):
             raise OperatorError('Account alias already exists; use replace-session')

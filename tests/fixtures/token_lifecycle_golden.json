@@ -1,0 +1,821 @@
+{
+  "provenance": {
+    "source": "6493.255af8eb.js",
+    "sha256": "8dd8857d5915dcfdd8fab4238faba13cc4909ea45c68898b0adf4ead0fc80dcc",
+    "kind": "original SDK, synthetic fixtures, offline fake transport",
+    "device_id": "00000000-0000-4000-8000-000000000001"
+  },
+  "cases": [
+    {
+      "name": "report-length-0",
+      "input": {
+        "mode": "report",
+        "response": {
+          "code": 0,
+          "data": {
+            "riskToken": ""
+          }
+        }
+      },
+      "expected": {
+        "step": 7,
+        "selected": "",
+        "sessionToken": null,
+        "localToken": null,
+        "sessionDs": null,
+        "cookieWrites": []
+      }
+    },
+    {
+      "name": "report-length-1",
+      "input": {
+        "mode": "report",
+        "response": {
+          "code": 0,
+          "data": {
+            "riskToken": "R"
+          }
+        }
+      },
+      "expected": {
+        "step": 2,
+        "selected": "R",
+        "sessionToken": "\"R\"",
+        "localToken": "\"R\"",
+        "sessionDs": "\"bbb9b618e36a750e71078e4a52d9fff2\"",
+        "cookieWrites": [
+          {
+            "name": "shopee_webUnique_ccd",
+            "value": "R",
+            "attributes": [
+              "expires=Sat, 15 Jan 2028 08:00:00 GMT",
+              "path=/"
+            ],
+            "now": 1800000000501
+          },
+          {
+            "name": "ds",
+            "value": "bbb9b618e36a750e71078e4a52d9fff2",
+            "attributes": [
+              "expires=Sat, 15 Jan 2028 08:00:00 GMT",
+              "path=/"
+            ],
+            "now": 1800000000501
+          }
+        ]
+      }
+    },
+    {
+      "name": "report-length-100",
+      "input": {
+        "mode": "report",
+        "response": {
+          "code": 0,
+          "data": {
+            "riskToken": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"
+          }
+        }
+      },
+      "expected": {
+        "step": 2,
+        "selected": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR",
+        "sessionToken": "\"RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR\"",
+        "localToken": "\"RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR\"",
+        "sessionDs": "\"0b58fe6b31feb2bd56efdf6f83e775c8\"",
+        "cookieWrites": [
+          {
+            "name": "shopee_webUnique_ccd",
+            "value": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR",
+            "attributes": [
+              "expires=Sat, 15 Jan 2028 08:00:00 GMT",
+              "path=/"
+            ],
+            "now": 1800000000501
+          },
+          {
+            "name": "ds",
+            "value": "0b58fe6b31feb2bd56efdf6f83e775c8",
+            "attributes": [
+              "expires=Sat, 15 Jan 2028 08:00:00 GMT",
+              "path=/"
+            ],
+            "now": 1800000000501
+          }
+        ]
+      }
+    },
+    {
+      "name": "report-length-101",
+      "input": {
+        "mode": "report",
+        "response": {
+          "code": 0,
+          "data": {
+            "riskToken": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"
+          }
+        }
+      },
+      "expected": {
+        "step": 2,
+        "selected": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR",
+        "sessionToken": "\"RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR\"",
+        "localToken": "\"RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR\"",
+        "sessionDs": "\"a7df54ae550a22f5b63e384346dd2cd1\"",
+        "cookieWrites": [
+          {
+            "name": "shopee_webUnique_ccd",
+            "value": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR",
+            "attributes": [
+              "expires=Sat, 15 Jan 2028 08:00:00 GMT",
+              "path=/"
+            ],
+            "now": 1800000000501
+          },
+          {
+            "name": "ds",
+            "value": "a7df54ae550a22f5b63e384346dd2cd1",
+            "attributes": [
+              "expires=Sat, 15 Jan 2028 08:00:00 GMT",
+              "path=/"
+            ],
+            "now": 1800000000501
+          }
+        ]
+      }
+    },
+    {
+      "name": "report-length-123",
+      "input": {
+        "mode": "report",
+        "response": {
+          "code": 0,
+          "data": {
+            "riskToken": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"
+          }
+        }
+      },
+      "expected": {
+        "step": 2,
+        "selected": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR",
+        "sessionToken": "\"RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR\"",
+        "localToken": "\"RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR\"",
+        "sessionDs": "\"5d025294f100725ee8a21f26a28985fd\"",
+        "cookieWrites": [
+          {
+            "name": "shopee_webUnique_ccd",
+            "value": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR",
+            "attributes": [
+              "expires=Sat, 15 Jan 2028 08:00:00 GMT",
+              "path=/"
+            ],
+            "now": 1800000000501
+          },
+          {
+            "name": "ds",
+            "value": "5d025294f100725ee8a21f26a28985fd",
+            "attributes": [
+              "expires=Sat, 15 Jan 2028 08:00:00 GMT",
+              "path=/"
+            ],
+            "now": 1800000000501
+          }
+        ]
+      }
+    },
+    {
+      "name": "report-length-299",
+      "input": {
+        "mode": "report",
+        "response": {
+          "code": 0,
+          "data": {
+            "riskToken": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"
+          }
+        }
+      },
+      "expected": {
+        "step": 2,
+        "selected": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR",
+        "sessionToken": "\"RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR\"",
+        "localToken": "\"RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR\"",
+        "sessionDs": "\"0de6a91f9e20044d640cae93b43425bf\"",
+        "cookieWrites": [
+          {
+            "name": "shopee_webUnique_ccd",
+            "value": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR",
+            "attributes": [
+              "expires=Sat, 15 Jan 2028 08:00:00 GMT",
+              "path=/"
+            ],
+            "now": 1800000000501
+          },
+          {
+            "name": "ds",
+            "value": "0de6a91f9e20044d640cae93b43425bf",
+            "attributes": [
+              "expires=Sat, 15 Jan 2028 08:00:00 GMT",
+              "path=/"
+            ],
+            "now": 1800000000501
+          }
+        ]
+      }
+    },
+    {
+      "name": "report-length-300",
+      "input": {
+        "mode": "report",
+        "response": {
+          "code": 0,
+          "data": {
+            "riskToken": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"
+          }
+        }
+      },
+      "expected": {
+        "step": 2,
+        "selected": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR",
+        "sessionToken": "\"RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR\"",
+        "localToken": "\"RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR\"",
+        "sessionDs": "\"84b46a555ace10fb4baa2795ad71e91c\"",
+        "cookieWrites": [
+          {
+            "name": "shopee_webUnique_ccd",
+            "value": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR",
+            "attributes": [
+              "expires=Sat, 15 Jan 2028 08:00:00 GMT",
+              "path=/"
+            ],
+            "now": 1800000000501
+          },
+          {
+            "name": "ds",
+            "value": "84b46a555ace10fb4baa2795ad71e91c",
+            "attributes": [
+              "expires=Sat, 15 Jan 2028 08:00:00 GMT",
+              "path=/"
+            ],
+            "now": 1800000000501
+          }
+        ]
+      }
+    },
+    {
+      "name": "report-length-301",
+      "input": {
+        "mode": "report",
+        "response": {
+          "code": 0,
+          "data": {
+            "riskToken": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"
+          }
+        }
+      },
+      "expected": {
+        "step": 2,
+        "selected": "",
+        "sessionToken": "\"RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR\"",
+        "localToken": "\"RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR\"",
+        "sessionDs": "\"8c19c3ed53642e880ef7b41548d6c077\"",
+        "cookieWrites": [
+          {
+            "name": "shopee_webUnique_ccd",
+            "value": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR",
+            "attributes": [
+              "expires=Sat, 15 Jan 2028 08:00:00 GMT",
+              "path=/"
+            ],
+            "now": 1800000000501
+          },
+          {
+            "name": "ds",
+            "value": "8c19c3ed53642e880ef7b41548d6c077",
+            "attributes": [
+              "expires=Sat, 15 Jan 2028 08:00:00 GMT",
+              "path=/"
+            ],
+            "now": 1800000000501
+          }
+        ]
+      }
+    },
+    {
+      "name": "report-length-512",
+      "input": {
+        "mode": "report",
+        "response": {
+          "code": 0,
+          "data": {
+            "riskToken": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"
+          }
+        }
+      },
+      "expected": {
+        "step": 2,
+        "selected": "",
+        "sessionToken": "\"RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR\"",
+        "localToken": "\"RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR\"",
+        "sessionDs": "\"fa87d7ef40d031079154b482e483ca8b\"",
+        "cookieWrites": [
+          {
+            "name": "shopee_webUnique_ccd",
+            "value": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR",
+            "attributes": [
+              "expires=Sat, 15 Jan 2028 08:00:00 GMT",
+              "path=/"
+            ],
+            "now": 1800000000501
+          },
+          {
+            "name": "ds",
+            "value": "fa87d7ef40d031079154b482e483ca8b",
+            "attributes": [
+              "expires=Sat, 15 Jan 2028 08:00:00 GMT",
+              "path=/"
+            ],
+            "now": 1800000000501
+          }
+        ]
+      }
+    },
+    {
+      "name": "report-code-number-1",
+      "input": {
+        "mode": "report",
+        "response": {
+          "code": 1,
+          "data": {
+            "riskToken": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"
+          }
+        }
+      },
+      "expected": {
+        "step": 7,
+        "selected": "",
+        "sessionToken": null,
+        "localToken": null,
+        "sessionDs": null,
+        "cookieWrites": []
+      }
+    },
+    {
+      "name": "report-code-number-200",
+      "input": {
+        "mode": "report",
+        "response": {
+          "code": 200,
+          "data": {
+            "riskToken": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"
+          }
+        }
+      },
+      "expected": {
+        "step": 7,
+        "selected": "",
+        "sessionToken": null,
+        "localToken": null,
+        "sessionDs": null,
+        "cookieWrites": []
+      }
+    },
+    {
+      "name": "report-code-string-0",
+      "input": {
+        "mode": "report",
+        "response": {
+          "code": "0",
+          "data": {
+            "riskToken": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"
+          }
+        }
+      },
+      "expected": {
+        "step": 7,
+        "selected": "",
+        "sessionToken": null,
+        "localToken": null,
+        "sessionDs": null,
+        "cookieWrites": []
+      }
+    },
+    {
+      "name": "report-code-object-null",
+      "input": {
+        "mode": "report",
+        "response": {
+          "code": null,
+          "data": {
+            "riskToken": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"
+          }
+        }
+      },
+      "expected": {
+        "step": 7,
+        "selected": "",
+        "sessionToken": null,
+        "localToken": null,
+        "sessionDs": null,
+        "cookieWrites": []
+      }
+    },
+    {
+      "name": "report-code-boolean-true",
+      "input": {
+        "mode": "report",
+        "response": {
+          "code": true,
+          "data": {
+            "riskToken": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"
+          }
+        }
+      },
+      "expected": {
+        "step": 7,
+        "selected": "",
+        "sessionToken": null,
+        "localToken": null,
+        "sessionDs": null,
+        "cookieWrites": []
+      }
+    },
+    {
+      "name": "report-code-boolean-false",
+      "input": {
+        "mode": "report",
+        "response": {
+          "code": false,
+          "data": {
+            "riskToken": "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"
+          }
+        }
+      },
+      "expected": {
+        "step": 7,
+        "selected": "",
+        "sessionToken": null,
+        "localToken": null,
+        "sessionDs": null,
+        "cookieWrites": []
+      }
+    },
+    {
+      "name": "raw-length-0",
+      "input": {
+        "mode": "raw",
+        "initial_step": 7,
+        "token": ""
+      },
+      "expected": {
+        "step": 7,
+        "selected": "",
+        "sessionToken": null,
+        "localToken": null,
+        "sessionDs": null,
+        "cookieWrites": []
+      }
+    },
+    {
+      "name": "raw-length-100",
+      "input": {
+        "mode": "raw",
+        "initial_step": 7,
+        "token": "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS"
+      },
+      "expected": {
+        "step": 7,
+        "selected": "",
+        "sessionToken": null,
+        "localToken": null,
+        "sessionDs": null,
+        "cookieWrites": []
+      }
+    },
+    {
+      "name": "raw-length-101",
+      "input": {
+        "mode": "raw",
+        "initial_step": 7,
+        "token": "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS"
+      },
+      "expected": {
+        "step": 7,
+        "selected": "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS",
+        "sessionToken": "\"SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS\"",
+        "localToken": "\"SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS\"",
+        "sessionDs": "\"ca4d379a48282a84999b60be0d5ccfb6\"",
+        "cookieWrites": [
+          {
+            "name": "shopee_webUnique_ccd",
+            "value": "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS",
+            "attributes": [
+              "expires=Sat, 15 Jan 2028 08:00:00 GMT",
+              "path=/"
+            ],
+            "now": 1800000000501
+          },
+          {
+            "name": "ds",
+            "value": "ca4d379a48282a84999b60be0d5ccfb6",
+            "attributes": [
+              "expires=Sat, 15 Jan 2028 08:00:00 GMT",
+              "path=/"
+            ],
+            "now": 1800000000501
+          }
+        ]
+      }
+    },
+    {
+      "name": "raw-length-123",
+      "input": {
+        "mode": "raw",
+        "initial_step": 7,
+        "token": "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS"
+      },
+      "expected": {
+        "step": 7,
+        "selected": "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS",
+        "sessionToken": "\"SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS\"",
+        "localToken": "\"SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS\"",
+        "sessionDs": "\"a35332d4a040a354e9f958d55160f8b3\"",
+        "cookieWrites": [
+          {
+            "name": "shopee_webUnique_ccd",
+            "value": "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS",
+            "attributes": [
+              "expires=Sat, 15 Jan 2028 08:00:00 GMT",
+              "path=/"
+            ],
+            "now": 1800000000501
+          },
+          {
+            "name": "ds",
+            "value": "a35332d4a040a354e9f958d55160f8b3",
+            "attributes": [
+              "expires=Sat, 15 Jan 2028 08:00:00 GMT",
+              "path=/"
+            ],
+            "now": 1800000000501
+          }
+        ]
+      }
+    },
+    {
+      "name": "raw-length-299",
+      "input": {
+        "mode": "raw",
+        "initial_step": 7,
+        "token": "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS"
+      },
+      "expected": {
+        "step": 7,
+        "selected": "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS",
+        "sessionToken": "\"SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS\"",
+        "localToken": "\"SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS\"",
+        "sessionDs": "\"72fc4ac2d5945464a6796f30a8cc859a\"",
+        "cookieWrites": [
+          {
+            "name": "shopee_webUnique_ccd",
+            "value": "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS",
+            "attributes": [
+              "expires=Sat, 15 Jan 2028 08:00:00 GMT",
+              "path=/"
+            ],
+            "now": 1800000000501
+          },
+          {
+            "name": "ds",
+            "value": "72fc4ac2d5945464a6796f30a8cc859a",
+            "attributes": [
+              "expires=Sat, 15 Jan 2028 08:00:00 GMT",
+              "path=/"
+            ],
+            "now": 1800000000501
+          }
+        ]
+      }
+    },
+    {
+      "name": "raw-length-300",
+      "input": {
+        "mode": "raw",
+        "initial_step": 7,
+        "token": "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS"
+      },
+      "expected": {
+        "step": 7,
+        "selected": "",
+        "sessionToken": null,
+        "localToken": null,
+        "sessionDs": null,
+        "cookieWrites": []
+      }
+    },
+    {
+      "name": "selection-step-0",
+      "input": {
+        "mode": "selection",
+        "step": 0,
+        "memory": "MEMORY",
+        "session": {
+          "shopee_webUnique_ccd": "\"SESSION\""
+        },
+        "local": {
+          "shopee_webUnique_ccd": "\"LOCAL\""
+        },
+        "cookies": {
+          "shopee_webUnique_ccd": "COOKIE"
+        }
+      },
+      "expected": {
+        "step": 0,
+        "selected": "COOKIE",
+        "sessionToken": "\"SESSION\"",
+        "localToken": "\"LOCAL\"",
+        "sessionDs": null,
+        "cookieWrites": []
+      }
+    },
+    {
+      "name": "selection-step-1",
+      "input": {
+        "mode": "selection",
+        "step": 1,
+        "memory": "MEMORY",
+        "session": {
+          "shopee_webUnique_ccd": "\"SESSION\""
+        },
+        "local": {
+          "shopee_webUnique_ccd": "\"LOCAL\""
+        },
+        "cookies": {
+          "shopee_webUnique_ccd": "COOKIE"
+        }
+      },
+      "expected": {
+        "step": 1,
+        "selected": "COOKIE",
+        "sessionToken": "\"SESSION\"",
+        "localToken": "\"LOCAL\"",
+        "sessionDs": null,
+        "cookieWrites": []
+      }
+    },
+    {
+      "name": "selection-step-2",
+      "input": {
+        "mode": "selection",
+        "step": 2,
+        "memory": "MEMORY",
+        "session": {
+          "shopee_webUnique_ccd": "\"SESSION\""
+        },
+        "local": {
+          "shopee_webUnique_ccd": "\"LOCAL\""
+        },
+        "cookies": {
+          "shopee_webUnique_ccd": "COOKIE"
+        }
+      },
+      "expected": {
+        "step": 2,
+        "selected": "MEMORY",
+        "sessionToken": "\"SESSION\"",
+        "localToken": "\"LOCAL\"",
+        "sessionDs": null,
+        "cookieWrites": []
+      }
+    },
+    {
+      "name": "selection-step-3",
+      "input": {
+        "mode": "selection",
+        "step": 3,
+        "memory": "MEMORY",
+        "session": {
+          "shopee_webUnique_ccd": "\"SESSION\""
+        },
+        "local": {
+          "shopee_webUnique_ccd": "\"LOCAL\""
+        },
+        "cookies": {
+          "shopee_webUnique_ccd": "COOKIE"
+        }
+      },
+      "expected": {
+        "step": 3,
+        "selected": "COOKIE",
+        "sessionToken": "\"SESSION\"",
+        "localToken": "\"LOCAL\"",
+        "sessionDs": null,
+        "cookieWrites": []
+      }
+    },
+    {
+      "name": "selection-step-6",
+      "input": {
+        "mode": "selection",
+        "step": 6,
+        "memory": "MEMORY",
+        "session": {
+          "shopee_webUnique_ccd": "\"SESSION\""
+        },
+        "local": {
+          "shopee_webUnique_ccd": "\"LOCAL\""
+        },
+        "cookies": {
+          "shopee_webUnique_ccd": "COOKIE"
+        }
+      },
+      "expected": {
+        "step": 6,
+        "selected": "COOKIE",
+        "sessionToken": "\"SESSION\"",
+        "localToken": "\"LOCAL\"",
+        "sessionDs": null,
+        "cookieWrites": []
+      }
+    },
+    {
+      "name": "selection-step-7",
+      "input": {
+        "mode": "selection",
+        "step": 7,
+        "memory": "MEMORY",
+        "session": {
+          "shopee_webUnique_ccd": "\"SESSION\""
+        },
+        "local": {
+          "shopee_webUnique_ccd": "\"LOCAL\""
+        },
+        "cookies": {
+          "shopee_webUnique_ccd": "COOKIE"
+        }
+      },
+      "expected": {
+        "step": 7,
+        "selected": "COOKIE",
+        "sessionToken": "\"SESSION\"",
+        "localToken": "\"LOCAL\"",
+        "sessionDs": null,
+        "cookieWrites": []
+      }
+    },
+    {
+      "name": "cache-length-300",
+      "input": {
+        "mode": "selection",
+        "step": 0,
+        "memory": "",
+        "session": {
+          "shopee_webUnique_ccd": "\"CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC\""
+        }
+      },
+      "expected": {
+        "step": 0,
+        "selected": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+        "sessionToken": "\"CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC\"",
+        "localToken": null,
+        "sessionDs": null,
+        "cookieWrites": []
+      }
+    },
+    {
+      "name": "cache-length-301",
+      "input": {
+        "mode": "selection",
+        "step": 0,
+        "memory": "",
+        "session": {
+          "shopee_webUnique_ccd": "\"CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC\""
+        }
+      },
+      "expected": {
+        "step": 0,
+        "selected": "",
+        "sessionToken": "\"CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC\"",
+        "localToken": null,
+        "sessionDs": null,
+        "cookieWrites": []
+      }
+    },
+    {
+      "name": "failed-report-preserves-cache",
+      "input": {
+        "mode": "report",
+        "initial_token": "OLD_CACHED",
+        "response": {
+          "code": 1
+        }
+      },
+      "expected": {
+        "step": 7,
+        "selected": "OLD_CACHED",
+        "sessionToken": "\"OLD_CACHED\"",
+        "localToken": "\"OLD_CACHED\"",
+        "sessionDs": null,
+        "cookieWrites": []
+      }
+    }
+  ]
+}

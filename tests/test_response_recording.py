@@ -33,6 +33,34 @@ def test_completion_fact_is_forwarded(verification, outcome):
     assert getattr(repo, method).call_args.kwargs['response_received'] is (outcome != 'timeout')
 
 
+@pytest.mark.parametrize('verification', [False, True])
+@pytest.mark.parametrize('outcome', ['success', 'api_error', 'timeout', 'normalization'])
+def test_response_cookies_are_private_and_forwarded_only_after_response(verification, outcome):
+    class Response(dict):
+        response_cookie_source = 'session=rotated-secret'
+
+    repo = Mock()
+    repo.claim_job.return_value = repo.claim_verification.return_value = work()
+    response = Response(product={'item_id': '123'})
+    fetch = Mock(return_value=response)
+    if outcome in ('api_error', 'timeout'):
+        error = (DirectVerificationError('private', response_received=True)
+                 if outcome == 'api_error' else DirectTransientError('private'))
+        # An erroneous fetch adapter must not persist cookies without a response.
+        error.response_cookie_source = response.response_cookie_source
+        fetch.side_effect = error
+    elif outcome == 'normalization':
+        fetch.return_value = Response(product=None)
+    if verification:
+        verify_account(repo, 'primary', '123', fetch=fetch)
+    else:
+        process_one(repo, fetch=fetch)
+    method = ('complete_' if outcome == 'success' else 'fail_') + ('verification' if verification else 'job')
+    call = getattr(repo, method).call_args
+    assert call.kwargs.get('response_cookie_source') == (None if outcome == 'timeout' else 'session=rotated-secret')
+    assert 'rotated-secret' not in str(call.args)
+
+
 def test_cli_import_records_the_captured_success_response(monkeypatch):
     from shopee_affiliate import session_signer
     from shopee_service import cli

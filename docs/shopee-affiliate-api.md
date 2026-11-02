@@ -9,6 +9,52 @@ new `session_signer` to persist cumulative request history and calls
 client below remains a single-lookup interface. Offline tests and container
 checks do not establish sustained live acceptance or production capacity.
 
+### Lifecycle investigation, 2026-11-02
+
+Repeated uncached requests still fail live. A successful verification followed
+by a cached Actor result is not evidence of automatic token renewal or sustained
+browser-free operation.
+
+Original-SDK experiments identified two per-request collectors that were being
+incorrectly carried forward from the captured seed: the change in the number of
+browser performance entries, and the number of input-event types whose counts
+changed. The managed signer now uses zero for both after browser handoff, because
+the isolated Python client produces neither browser performance entries nor
+browser input events. It preserves the captured absolute entry count. Optional
+low-level overrides also reproduce positive entry deltas. Four synthetic SDK
+transitions verify complete signature equality, including a nonzero-to-zero
+transition. This fixes a local semantic mismatch; server acceptance is separate.
+
+In a normal Chrome request for product `52253929694`, the product API returned
+code `0`. The device token read from the SDK after startup differed from the
+successful request's token, while consecutive getter calls were stable. The
+captured SAP payload embedded the same token as the initial request header.
+A follow-up XHR using the current getter still reached the traffic-error page.
+Thus a stale token is a demonstrated lifecycle gap, but updating that token
+alone has not been shown to fix acceptance.
+
+The device SDK obtains tokens through its separate device-report endpoint,
+`https://df.infra.sz.shopee.vn/v2/shpsec/web/report`. Its client-check payload
+depends on device collectors. Reproducing response ingestion does not recreate
+that payload or establish the server's token lifetime. Do not substitute
+synthetic device measurements in live requests or infer token validity from a
+browser cookie's expiry date.
+
+`shopee_affiliate.token_lifecycle` models the verified response/cache subset
+without network access. It distinguishes the raw `setResponseText` length gate
+from the report response envelope, updates immutable token/storage state,
+derives the SDK's `ds` compatibility digest, and represents cookie writes as
+data. Token selection and safe HTTP-header validation are separate operations.
+All fixture values are synthetic; credentials are excluded from object reprs.
+The module is not an automatic renewal service and is not wired into the managed
+worker. Issuer transport, device-report collection, and failure-path client-check
+generation remain unresolved. The subsequent managed-service implementation
+now persists response-cookie changes with signing counters and supports a
+version-fenced Chrome-to-service session replacement through a local CLI.
+See [the refresh workflow](managed-actor.md#refresh-from-your-current-chrome-through-a-local-cli).
+Local live verification and a cached Actor delivery succeeded on November 2;
+this does not establish sustained uncached acceptance or browser-free issuance.
+
 ## Browser-free Python client — verified 2026-10-28
 
 `shopee_affiliate.signed_client` generates fresh signatures in Python and calls the

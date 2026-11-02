@@ -248,6 +248,14 @@ def refresh_collection(kind: str, plaintext: bytes, context) -> bytes:
         raise ValueError('Advancing request state requires explicit uint32 elapsed_seconds')
     if not advance and elapsed_seconds is not None:
         raise ValueError('elapsed_seconds requires advance_request')
+    deltas = {
+        38475: (getattr(context, 'resource_entry_delta', None), 1348351202),
+        38393: (getattr(context, 'changed_event_types', None), 1810204798),
+    }
+    for delta, _ in deltas.values():
+        if delta is not None and (not advance or type(delta) is not int
+                                  or not 0 <= delta <= 0xffffffff):
+            raise ValueError('Collector resource/event delta requires advance_request and uint32')
     counter_constants = {37057: 3947457725, 36744: 3882804305,
                          35838: 604268431, 37224: 1471809388}
     advance_xhr = getattr(context, 'advance_xhr', False)
@@ -263,7 +271,19 @@ def refresh_collection(kind: str, plaintext: bytes, context) -> bytes:
     refreshed = []
     for item in fields:
         value = item['value']
-        if advance and item['pc'] in counter_constants:
+        if item['pc'] in deltas and deltas[item['pc']][0] is not None:
+            # SDK3023.VV3/VV5 sample and replace their per-path baselines on
+            # every signature; the previous request's deltas are not device facts.
+            delta, constant = deltas[item['pc']]
+            value = delta ^ new_u32 ^ constant
+        elif item['pc'] == 45351 and deltas[38475][0] is not None:
+            # Same-path continuation: its sampled entry delta also advances
+            # the absolute performance.getEntries().length collector.
+            total = (value ^ old_u32 ^ 1234494780) + deltas[38475][0]
+            if total > 0xffffffff:
+                raise ValueError('Collector resource entry total overflow')
+            value = total ^ new_u32 ^ 1234494780
+        elif advance and item['pc'] in counter_constants:
             constant = counter_constants[item['pc']]
             count = value ^ old_u32 ^ constant
             if count == 0xffffffff:

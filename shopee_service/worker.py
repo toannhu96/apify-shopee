@@ -36,6 +36,13 @@ def _fetch(work, fetch):
                  proxy_url=work.proxy_url)
 
 
+def _response_metadata(received, cookie_source):
+    metadata = {'response_received': received}
+    if received and cookie_source is not None:
+        return {**metadata, 'response_cookie_source': cookie_source}
+    return metadata
+
+
 def process_one(repo, *, fetch=fetch_signed_product):
     work = repo.claim_job()
     if work is None:
@@ -43,24 +50,27 @@ def process_one(repo, *, fetch=fetch_signed_product):
     if not repo.reservation_current(work):
         return True
     received = False
+    response_cookie_source = None
     phase = 'job_fetch'
     try:
         response = _fetch(work, fetch)
         received = True
+        response_cookie_source = getattr(response, 'response_cookie_source', None)
         phase = 'job_result'
         result = normalize_output(response['product'], fetched_at=datetime.now(UTC), cache_hit=False)
     except DirectError as error:
         _log_failure(phase, error)
         received = received or error.response_received is True
+        response_cookie_source = getattr(error, 'response_cookie_source', None) or response_cookie_source
         code = error.category if error.category != 'input' else 'signing'
-        repo.fail_job(work, code, response_received=received)
+        repo.fail_job(work, code, **_response_metadata(received, response_cookie_source))
     except Exception:  # noqa: BLE001 - never leak credentials in third-party errors
         # Response parsing and third-party exceptions must never expose headers,
         # response bodies or proxy URLs in logs.
         _log_failure(phase)
-        repo.fail_job(work, 'invalid_response', response_received=received)
+        repo.fail_job(work, 'invalid_response', **_response_metadata(received, response_cookie_source))
     else:
-        repo.complete_job(work, result, response_received=received)
+        repo.complete_job(work, result, **_response_metadata(received, response_cookie_source))
     return True
 
 
@@ -69,22 +79,25 @@ def verify_account(repo, alias, item_id, *, fetch=fetch_signed_product):
     if work is None or not repo.reservation_current(work):
         return False
     received = False
+    response_cookie_source = None
     phase = 'verification_fetch'
     try:
         response = _fetch(work, fetch)
         received = True
+        response_cookie_source = getattr(response, 'response_cookie_source', None)
         phase = 'verification_result'
-        normalize_output(response['product'], fetched_at=datetime.now(UTC), cache_hit=False)
+        result = normalize_output(response['product'], fetched_at=datetime.now(UTC), cache_hit=False)
     except DirectError as error:
         _log_failure(phase, error)
         received = received or error.response_received is True
-        repo.fail_verification(work, error.category, response_received=received)
+        response_cookie_source = getattr(error, 'response_cookie_source', None) or response_cookie_source
+        repo.fail_verification(work, error.category, **_response_metadata(received, response_cookie_source))
         return False
     except Exception:  # noqa: BLE001 - never leak credentials in third-party errors
         _log_failure(phase)
-        repo.fail_verification(work, 'invalid_response', response_received=received)
+        repo.fail_verification(work, 'invalid_response', **_response_metadata(received, response_cookie_source))
         return False
-    return repo.complete_verification(work, response_received=received)
+    return repo.complete_verification(work, result, **_response_metadata(received, response_cookie_source))
 
 
 def run_loop(repo, settings, stop):

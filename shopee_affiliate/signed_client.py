@@ -16,12 +16,21 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 
 from . import direct, http_transport
+from .response_cookies import apply_response_cookies
 
 MAX_STATE_BYTES = 128 * 1024
 MAX_COOKIE_INPUT_BYTES = 1024 * 1024
 REQUIRED_SEED_HEADERS = frozenset({'x-sap-ri', 'x-sap-sec', 'af-ac-enc-sz-token',
                                   'user-agent', 'x-sz-sdk-version'})
 Signer = Callable[[str, Mapping[str, str]], Mapping[str, str]]
+
+
+class ProductResponse(dict):
+    """Product payload with private, non-serialized cookie continuity metadata."""
+
+    def __init__(self, payload, response_cookie_source=None):
+        super().__init__(payload)
+        self.response_cookie_source = response_cookie_source
 
 
 def _pairs(pairs):
@@ -113,7 +122,7 @@ def fetch_product(item_id: str | int, *, seed_headers: Mapping[str, str],
         generated = _normalized_headers(signer(identifier, seed))
     except Exception:  # noqa: BLE001 - never expose signer state in exception output
         raise direct.DirectSigningError('Could not generate fresh signing headers') from None
-    return _fetch_validated(identifier, generated, cookie)
+    return _fetch_validated(identifier, generated, cookie, cookie_source=cookie_source)
 
 
 def fetch_signed_product(item_id: str | int, *, headers: Mapping[str, str],
@@ -129,11 +138,12 @@ The proxy is operator configuration, never a public Actor input.
         http_transport.validate_proxy_url(proxy_url)
     except (ValueError, TypeError):
         raise direct.DirectInputError('Product ID, reserved headers or proxy are invalid') from None
-    return _fetch_validated(identifier, generated, _cookie_header(cookie_source), proxy_url)
+    return _fetch_validated(identifier, generated, _cookie_header(cookie_source), proxy_url,
+                            cookie_source=cookie_source)
 
 
 def _fetch_validated(identifier: str, generated: Mapping[str, str], cookie: str,
-                     proxy_url: str | None = None) -> dict:
+                     proxy_url: str | None = None, *, cookie_source: str | None = None) -> dict:
     options = {} if proxy_url is None else {'proxy_url': proxy_url}
     try:
         response = http_transport.request_product(identifier, headers=generated, cookie=cookie, **options)
@@ -143,13 +153,24 @@ def _fetch_validated(identifier: str, generated: Mapping[str, str], cookie: str,
         raise error_class(str(error)) from None
     except ValueError:
         raise direct.DirectInputError('Generated request inputs are invalid') from None
+    response_cookie_source = None
+    try:
+        if response.set_cookie_headers:
+            source = cookie if cookie_source is None else cookie_source
+            response_cookie_source = apply_response_cookies(source, response.set_cookie_headers,
+                                                            http_transport.product_url(identifier))
+    except ValueError:
+        raise direct.DirectError('Invalid response cookie update', http_status=response.status,
+                                 response_received=True,
+                          response_cookie_source=response_cookie_source) from None
     try:
         _check_status(response.status)
-        return direct._validate(response.body, identifier)
+        return ProductResponse(direct._validate(response.body, identifier), response_cookie_source)
     except direct.DirectError as error:
         # Carry bounded facts to private operator logs, never the response body.
         raise type(error)(str(error), http_status=response.status, api_code=error.api_code,
-                          response_received=True) from None
+                          response_received=True,
+                          response_cookie_source=response_cookie_source) from None
 
 
 def _check_status(status: int) -> None:
