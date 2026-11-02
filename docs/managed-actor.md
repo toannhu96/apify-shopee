@@ -108,6 +108,32 @@ the actual PostgreSQL role password using a trusted interactive tool, then updat
 the connection URLs. Changing `POSTGRES_PASSWORD` alone does not update an
 initialized database.
 
+### Recover a database password and session key together
+
+When both credentials need rotation, stop all API, worker and account-admin
+processes. The maintenance helper runs inside the service network using the
+current `SH_DATABASE_URL` and `SH_SECRET_KEY`, plus privately supplied
+`SH_NEXT_DATABASE_PASSWORD` and `SH_NEXT_SECRET_KEY`:
+
+```sh
+python -m shopee_service.recover --maintenance-confirmed --wait
+```
+
+It re-encrypts stored sessions and changes the connecting PostgreSQL role's
+password in the same transaction under the repository lock. Outstanding leases,
+mixed or unknown encryption, and invalid replacement inputs abort recovery.
+The raw password is converted to a SCRAM verifier locally before the SQL command.
+Only `CREDENTIAL_RECOVERY_COMPLETE` with numeric counts establishes success.
+With `--wait`, the container stays idle after either success or failure.
+
+After success, stop the maintenance container, update both service configurations
+to the new password/key, and update PostgreSQL's configured password to match.
+Replace the separate API bearer token in the API, worker and Apify as needed.
+Restore the normal worker command before starting services. On a retry after an
+uncertain outcome, retain the same old/new inputs: the helper can reconnect with
+the replacement password and recognize rows already using the replacement key.
+Never clear lease markers or discard account data to force a recovery through.
+
 ## Account operations
 
 Account imports contain cookies, accepted signing headers and optional stable
