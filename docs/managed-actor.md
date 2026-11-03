@@ -64,7 +64,9 @@ does not run them on your production server.
 5. Start `docker compose up -d api worker`. Check `/health` through the loopback
    endpoint. It verifies database readiness without exposing configuration.
 6. Put an HTTPS reverse proxy in front of `127.0.0.1:8000`. Forward only to the API,
-   cap request bodies at 64 KiB, and never log Authorization headers. PostgreSQL has
+   cap ordinary request bodies at 64 KiB, and never log Authorization headers or
+   request bodies. The optional operator session route needs the larger limit
+   described below. PostgreSQL has
    no public host port. The public Actor refuses plaintext backend connections.
 
 Compose uses the operator UID/GID recorded in `.env` so the non-root application
@@ -183,8 +185,8 @@ docker exec -i SERVICE_CONTAINER python -m shopee_service.cli set-proxy-stdin pr
 Use the version from `list-accounts`. This operation preserves the stored cookies
 and signing state, atomically rejects stale versions or disabled accounts,
 invalidates cached results, and performs one verification request after any
-existing pacing or lease delay. Credentials stay in encrypted account storage;
-they are never accepted through public Actor inputs or an HTTP administration route.
+existing pacing or lease delay. Proxy credentials stay in encrypted account storage;
+they are never accepted through public Actor inputs or the HTTP session refresh route.
 An unsuccessful verification leaves the account paused.
 
 When importing cookie and seed files that work with `shopee_affiliate.signed_client`,
@@ -288,6 +290,105 @@ References: [Actor definitions](https://docs.apify.com/actors/development/actor-
 [secret environment variables](https://docs.apify.com/actors/development/programming-interface/environment-variables),
 [Store publication](https://docs.apify.com/actors/publishing/publish).
 
+### Refresh directly through the HTTPS API
+
+The browser refresh CLI can send a new session directly to the API. It requires
+no local Docker container or SSH connection. Chrome must still be running on
+your computer with a loopback debugging endpoint and a signed-in Shopee Affiliate
+tab. If login or verification has expired in Chrome, complete it there first.
+
+One-time server setup for the CapRover `shopee-api` app:
+
+1. Deploy the updated service code.
+2. Set `SH_SESSION_REFRESH_TOKEN` to a randomly generated operator token of at
+   least 32 non-whitespace ASCII characters. It must differ from `SH_API_TOKEN`.
+   The API also accepts `SH_SESSION_REFRESH_TOKEN_FILE` for a mounted secret.
+   Leave it unset to disable HTTP session administration. Keep this token out
+   of Apify Actor inputs and customer-facing configuration.
+3. Serve the API over HTTPS. Allow up to 2 MiB for
+   `POST /v1/admin/accounts/{alias}/session` and set the reverse proxy's read
+   timeout to at least 180 seconds. Verification can wait up to 90 seconds for
+   existing pacing before making a Shopee request. Keep Authorization headers
+   and request bodies out of proxy/access logs.
+
+On your Mac, load that same token into `SH_SESSION_REFRESH_TOKEN`. To enter it
+without placing its value in shell history, use this zsh prompt:
+
+```sh
+read -rs 'SH_SESSION_REFRESH_TOKEN?Session refresh token: '
+export SH_SESSION_REFRESH_TOKEN
+```
+
+Alternatively, use the executable helper, which prompts for the token with hidden
+input when the environment variable is unset:
+
+```sh
+./scripts/refresh-session.sh
+./scripts/refresh-session.sh --watch
+./scripts/refresh-session.sh another-account --signing-mode standalone-seed
+```
+
+The helper defaults to `primary` and the API URL below. It can be launched from
+any directory by using its absolute path. It does not save the token or start
+Chrome; the browser debugging endpoint and signed-in session must already exist.
+Use `--help` to see defaults and override options.
+
+To invoke the Python CLI directly, run from the repository directory
+(replace `primary` with your account alias):
+
+```sh
+.venv/bin/python -m shopee_service.browser_refresh primary \
+  --api-url https://shopee-api.gcp.nudgen.net \
+  --cdp-url http://127.0.0.1:9222 \
+  --item-id 24995347301 --once
+```
+
+Use `--watch` instead of `--once` to check every 30 seconds and refresh when
+needed. Add `--signing-mode standalone-seed` if the existing account uses that
+signing lifecycle; the CLI defaults to `cumulative`. Keep Chrome and the CLI
+running. The CLI captures cookies and signing
+headers into memory and sends them over HTTPS, without writing them to disk.
+It refuses plaintext URLs, redirects, and automatic POST retries. After a
+timeout, check account status before retrying: the replacement may have committed.
+
+The operator API accepts `Authorization: Bearer <operator-token>`:
+
+| Method and path | Purpose |
+| --- | --- |
+| `GET /v1/admin/accounts/{alias}` | Returns only `alias`, `version`, `status`. |
+| `POST /v1/admin/accounts/{alias}/session` | Replaces and verifies a session with the body below. |
+
+```json
+{
+  "expected_version": 2,
+  "item_id": "24995347301",
+  "cookie_source": "<scoped browser cookie export or cookie header>",
+  "headers": {"<captured signing header>": "<value>"},
+  "signing_mode": "cumulative"
+}
+```
+
+The browser CLI fills these fields automatically using an accepted browser
+request. For a custom caller, read the account version before capturing the
+session. Supply all required signing headers, not just cookies. `signing_mode`
+defaults to `cumulative`; `standalone-seed` is also accepted for manual imports.
+Unknown fields, duplicate JSON keys, invalid headers and oversized bodies are
+rejected. Send an accurate `Content-Length` and an uncompressed JSON body.
+
+Success returns `{"alias":"primary","version":3,"status":"healthy","verified":true}`.
+A `200` with `verified:false` means the new version was stored but verification
+did not complete successfully. Inspect its status before retrying. `409` means
+the account was disabled or changed since capture; fetch its current status.
+`401` means the operator token is missing/invalid or the feature is disabled.
+Admin status requests are limited to 30 per minute and uploads to 5 per minute
+per API process, separately from product-job traffic.
+
+Replacement preserves the configured proxy, encrypts credentials at rest,
+invalidates cached data for the old session and fences old workers. Verification
+is bound to the exact replacement version. Only a successful verification
+activates it. The ordinary Actor API token cannot access these operator routes.
+Completed Apify runs are not restarted automatically after recovery.
+
 ### Refresh from your current Chrome through a local CLI
 
 The local refresh CLI attaches to an already-running Chrome debugging endpoint.
@@ -320,7 +421,7 @@ the watcher, preventing repeated renewal attempts.
 
 Cookies and headers travel in memory through SSH stdin to the private admin
 command `refresh-session-stdin`. They are not written to files, command arguments,
-logs, Actor inputs, datasets, or the public HTTP API. SSH uses noninteractive
+logs, Actor inputs, datasets, or ordinary product-job API routes. SSH uses noninteractive
 key authentication and strict host-key checking. The server checks the account
 version captured before browser access, replaces cookies and signing state in
 one transaction, preserves the configured proxy, and fences old workers. It

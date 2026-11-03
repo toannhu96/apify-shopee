@@ -50,8 +50,9 @@ The module is not an automatic renewal service and is not wired into the managed
 worker. Issuer transport, device-report collection, and failure-path client-check
 generation remain unresolved. The subsequent managed-service implementation
 now persists response-cookie changes with signing counters and supports a
-version-fenced Chrome-to-service session replacement through a local CLI.
-See [the refresh workflow](managed-actor.md#refresh-from-your-current-chrome-through-a-local-cli).
+version-fenced Chrome-to-service session replacement through a local CLI using
+the operator HTTPS API, SSH or Docker.
+See [the refresh workflow](managed-actor.md#refresh-directly-through-the-https-api).
 Local live verification and a cached Actor delivery succeeded on November 2;
 this does not establish sustained uncached acceptance or browser-free issuance.
 

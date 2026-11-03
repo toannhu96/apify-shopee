@@ -417,9 +417,11 @@ class Repository:
                 conn.execute('DELETE FROM jobs WHERE item_id=%s', (work.item_id,))
             return True
 
-    def claim_verification(self, alias, item_id, *, reserve=None):
+    def claim_verification(self, alias, item_id, *, reserve=None, expected_version=None):
         _id(alias, ALIAS)
         _id(item_id, ITEM_ID)
+        if expected_version is not None and (type(expected_version) is not int or expected_version < 1):
+            raise ValueError('Invalid account version')
         if reserve is None:
             from shopee_affiliate.managed_signing import reserve_request
             reserve = reserve_request
@@ -428,6 +430,8 @@ class Repository:
             account = conn.execute('SELECT * FROM accounts WHERE alias=%s', (alias,)).fetchone()
             if not account:
                 raise Missing('Account not found')
+            if expected_version is not None and account['version'] != expected_version:
+                return None
             if account['lease_token'] or account['next_request_at'] > datetime.now(UTC):
                 return None
             if account['status'] == 'disabled':

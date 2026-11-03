@@ -78,6 +78,7 @@ class Settings:
     min_interval_seconds: float = 6
     lease_seconds: float = 90
     api_rate_limit: int = 600
+    session_refresh_token: str | None = field(default=None, repr=False)
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> Settings:
@@ -92,6 +93,10 @@ class Settings:
             raise ConfigurationError('SH_DATABASE_URL is invalid') from None
         if len(api_token) < 32 or not api_token.isascii() or any(c.isspace() for c in api_token):
             raise ConfigurationError('SH_API_TOKEN must contain at least 32 non-whitespace ASCII characters')
+        refresh_token = _value(source, 'SH_SESSION_REFRESH_TOKEN', required=False) or None
+        if refresh_token is not None and (len(refresh_token) < 32 or not refresh_token.isascii()
+                or any(c.isspace() for c in refresh_token) or refresh_token == api_token):
+            raise ConfigurationError('SH_SESSION_REFRESH_TOKEN must be a separate token of at least 32 non-whitespace ASCII characters')
         try:
             Fernet(secret_key.encode('ascii'))
         except (ValueError, TypeError, UnicodeError):
@@ -100,4 +105,4 @@ class Settings:
                    validate_webhook(_value(source, 'SH_DISCORD_WEBHOOK', required=False)),
                    _number(source, 'SH_MIN_INTERVAL_SECONDS', 6, 6, 3600),
                    _number(source, 'SH_LEASE_SECONDS', 90, 60, 3600),
-                   _integer(source, 'SH_API_RATE_LIMIT', 600, 60, 60000))
+                   _integer(source, 'SH_API_RATE_LIMIT', 600, 60, 60000), refresh_token)

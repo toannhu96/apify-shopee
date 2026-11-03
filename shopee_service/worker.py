@@ -74,8 +74,9 @@ def process_one(repo, *, fetch=fetch_signed_product):
     return True
 
 
-def verify_account(repo, alias, item_id, *, fetch=fetch_signed_product):
-    work = repo.claim_verification(alias, item_id)
+def verify_account(repo, alias, item_id, *, fetch=fetch_signed_product, expected_version=None):
+    options = {} if expected_version is None else {'expected_version': expected_version}
+    work = repo.claim_verification(alias, item_id, **options)
     if work is None or not repo.reservation_current(work):
         return False
     received = False

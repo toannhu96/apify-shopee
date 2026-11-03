@@ -102,9 +102,14 @@ def _repository():
 
 def _stdin_credentials(mode: str = 'cumulative') -> dict:
     from shopee_affiliate import signed_client
+    return session_credentials(sys.stdin.buffer.read(2 * signed_client.MAX_COOKIE_INPUT_BYTES + 1), mode)
+
+
+def session_credentials(raw: bytes, mode: str = 'cumulative') -> dict:
+    """Validate a bounded session handoff for both stdin and the operator API."""
+    from shopee_affiliate import signed_client
     maximum = 2 * signed_client.MAX_COOKIE_INPUT_BYTES
     try:
-        raw = sys.stdin.buffer.read(maximum + 1)
         if len(raw) > maximum:
             raise ValueError()
         value = json.loads(raw.decode('utf-8'), object_pairs_hook=signed_client._pairs,
@@ -160,14 +165,19 @@ def _set_proxy_stdin(args, repo):
 
 
 def _report_verification(args, repo, version):
-    ready = _wait_for_verification(repo, args.alias, version)
-    accepted = ready and _verify(repo, args.alias, args.item_id)
-    row = next((row for row in repo.list_accounts() if row['alias'] == args.alias), {})
+    print(json.dumps(verification_result(repo, args.alias, args.item_id, version)))
+
+
+def verification_result(repo, alias, item_id, version, *, verify=None):
+    """Return only safe status fields after bounded verification."""
+    ready = _wait_for_verification(repo, alias, version)
+    accepted = ready and (verify or _verify)(repo, alias, item_id)
+    row = next((row for row in repo.list_accounts() if row['alias'] == alias), {})
     status = row.get('status', 'unavailable')
-    if status not in {'healthy', 'pending', 'authentication', 'verification', 'rate_limit', 'disabled', 'unavailable'}:
+    if status not in {'healthy', 'pending', 'authentication', 'verification', 'signing', 'rate_limit', 'disabled', 'unavailable'}:
         status = 'unavailable'
     verified = accepted is True and row.get('version') == version and status == 'healthy'
-    print(json.dumps({'alias': args.alias, 'version': version, 'status': status, 'verified': verified}))
+    return {'alias': alias, 'version': version, 'status': status, 'verified': verified}
 
 
 def _wait_for_verification(repo, alias, version):

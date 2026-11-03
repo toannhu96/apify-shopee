@@ -32,6 +32,22 @@ def deadline():
     return datetime.now(UTC) + timedelta(hours=1)
 
 
+def test_verification_cannot_reserve_newer_session(repo):
+    account(repo)
+    before = repo.list_accounts()[0]
+    assert repo.claim_verification('primary', '123', expected_version=before['version'] + 1,
+                                   reserve=reserve) is None
+    assert repo.list_accounts()[0] == before
+    assert repo.claim_verification('primary', '123', expected_version=before['version'],
+                                   reserve=reserve) is not None
+
+
+@pytest.mark.parametrize('version', [True, 0, -1, '1'])
+def test_verification_rejects_invalid_version(repo, version):
+    with pytest.raises(ValueError):
+        repo.claim_verification('primary', '123', expected_version=version)
+
+
 def test_standalone_seed_reservations_persist_and_keep_original_seed(repo, monkeypatch):
     import json
     from pathlib import Path

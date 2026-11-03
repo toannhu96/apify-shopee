@@ -31,6 +31,21 @@ def test_settings_file_precedence_and_redacted_repr(tmp_path):
         config.api_token = 'other'
 
 
+def test_refresh_token_optional_separate_and_file_supported(tmp_path):
+    assert Settings.from_env(env()).session_refresh_token is None
+    path = tmp_path / 'refresh-token'
+    path.write_text('c' * 32 + '\n')
+    config = Settings.from_env(env(SH_SESSION_REFRESH_TOKEN_FILE=str(path)))
+    assert config.session_refresh_token == 'c' * 32 and 'cccc' not in repr(config)
+
+
+@pytest.mark.parametrize('token', ['a' * 32, 'short', 'b ' * 32, 'é' * 32, 'b\n' * 32])
+def test_invalid_refresh_token_never_echoed(token):
+    with pytest.raises(ConfigurationError) as caught:
+        Settings.from_env(env(SH_SESSION_REFRESH_TOKEN=token))
+    assert token not in str(caught.value)
+
+
 @pytest.mark.parametrize('changes', [
     {'SH_DATABASE_URL': ''}, {'SH_API_TOKEN': 'small'}, {'SH_SECRET_KEY': 'broken'},
     {'SH_MIN_INTERVAL_SECONDS': '5'}, {'SH_MIN_INTERVAL_SECONDS': 'NaN'},

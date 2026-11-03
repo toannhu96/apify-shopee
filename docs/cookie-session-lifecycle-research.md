@@ -76,8 +76,8 @@ addressed. Cookie and signing-state replacement uses a version check and lease
 fencing; disabled accounts cannot be reactivated by an automatic refresh.
 The CLI captures an accepted normal Chrome product request, transfers its
 headers and scoped cookies privately, and verifies the replacement before use.
-It can watch account health through SSH or a local Docker container.
-See [the current workflow](managed-actor.md#refresh-from-your-current-chrome-through-a-local-cli).
+It can watch account health through the operator HTTPS API, SSH or a local Docker container.
+See [the current workflow](managed-actor.md#refresh-directly-through-the-https-api).
 The separate device-report issuer and in-place token-transition reconstruction
 remain research work. Local live verification plus a cached Actor delivery
 succeeded on November 2; sustained uncached production acceptance is not implied.

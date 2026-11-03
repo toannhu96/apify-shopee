@@ -1,4 +1,4 @@
-"""Small authenticated API. Shopee credentials are never an HTTP input/output."""
+"""Authenticated run API and separately authorized operator session handoff."""
 import hmac
 import logging
 import math
@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from .config import Settings
 from .repository import Conflict, Missing, Repository
 from .secrets import Cipher
+from .session_api import MAX_SESSION_BYTES, register_session_routes
 
 Identifier = Annotated[str, Field(pattern=r'^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$', strict=True)]
 ItemId = Annotated[str, Field(pattern=r'^[1-9][0-9]{0,19}$', strict=True)]
@@ -41,7 +42,9 @@ class Delivery(BaseModel):
     resultId: str = Field(min_length=1, max_length=256, strict=True)
 
 
-def create_app(*, repository=None, api_token=None, rate_limit=600):
+def create_app(*, repository=None, api_token=None, rate_limit=600, session_refresh_token=None):
+    if session_refresh_token and session_refresh_token == api_token:
+        raise ValueError('Session refresh requires a separate operator token')
     @asynccontextmanager
     async def lifespan(app):
         if repository is None:
@@ -51,31 +54,40 @@ def create_app(*, repository=None, api_token=None, rate_limit=600):
                                               lease_seconds=settings.lease_seconds)
             app.state.api_token = settings.api_token
             app.state.rate_limit = settings.api_rate_limit
+            app.state.session_refresh_token = settings.session_refresh_token
         yield
 
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.repository = repository
     app.state.api_token = api_token
     app.state.rate_limit = rate_limit
-    recent = deque()
+    app.state.session_refresh_token = session_refresh_token
+    windows = {'api': deque(), 'admin': deque(), 'refresh': deque()}
 
     @app.middleware('http')
     async def guard(request: Request, call_next):
         if request.url.path != '/health':
+            admin = request.url.path.startswith('/v1/admin/')
             authorization = request.headers.get('authorization', '')
-            expected = 'Bearer ' + (app.state.api_token or '')
-            if not app.state.api_token or not hmac.compare_digest(authorization.encode(), expected.encode()):
+            token = app.state.session_refresh_token if admin else app.state.api_token
+            expected = 'Bearer ' + (token or '')
+            if not token or not hmac.compare_digest(authorization.encode(), expected.encode()):
                 return JSONResponse({'detail': 'Authentication required'}, status_code=401)
             if request.method == 'POST':
                 length = request.headers.get('content-length')
-                if length is None or not length.isascii() or not length.isdecimal():
+                if length is None or not length.isascii() or not length.isdecimal() or len(length) > 10:
                     return JSONResponse({'detail': 'Content-Length required'}, status_code=411)
-                if int(length) > 65536:
+                if int(length) > (MAX_SESSION_BYTES if admin else 65536):
                     return JSONResponse({'detail': 'Request is too large'}, status_code=413)
+                if admin and request.headers.get('content-encoding', 'identity') != 'identity':
+                    return JSONResponse({'detail': 'Unsupported content encoding'}, status_code=415)
+            bucket = ('refresh' if request.method == 'POST' else 'admin') if admin else 'api'
+            recent = windows[bucket]
+            limit = {'refresh': 5, 'admin': 30, 'api': app.state.rate_limit}[bucket]
             now = time.monotonic()
             while recent and recent[0] <= now - 60:
                 recent.popleft()
-            if len(recent) >= app.state.rate_limit:
+            if len(recent) >= limit:
                 return JSONResponse({'detail': 'Request limit reached'}, status_code=429, headers={'Retry-After': str(min(61, max(1, math.ceil(60 - (now - recent[0])) + 1)))})
             recent.append(now)
         try:
@@ -83,6 +95,13 @@ def create_app(*, repository=None, api_token=None, rate_limit=600):
         except Exception:  # noqa: BLE001 - sanitize third-party failures at HTTP boundary
             logging.getLogger(__name__).error('Backend request failed; details withheld')
             return JSONResponse({'detail': 'Service temporarily unavailable'}, status_code=503)
+
+    @app.middleware('http')
+    async def no_store(request: Request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith('/v1/admin/'):
+            response.headers['Cache-Control'] = 'no-store'
+        return response
 
     @app.exception_handler(RequestValidationError)
     async def invalid_input(_request, _error):
@@ -127,6 +146,7 @@ def create_app(*, repository=None, api_token=None, rate_limit=600):
     def delivery(run_id: RunPath, item_id: ItemPath, body: Delivery):
         return app.state.repository.record_delivery(run_id, item_id, body.phase, body.resultId)
 
+    register_session_routes(app)
     return app
 
 

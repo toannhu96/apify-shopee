@@ -11,6 +11,14 @@ def work():
     return Reservation('123', 'primary', 1, 'token', 1, {'private': 'secret'}, 'cookie=secret', None)
 
 
+def test_verification_passes_expected_version_before_any_fetch():
+    repo, fetch = Mock(), Mock()
+    repo.claim_verification.return_value = None
+    assert verify_account(repo, 'primary', '123', expected_version=2, fetch=fetch) is False
+    repo.claim_verification.assert_called_once_with('primary', '123', expected_version=2)
+    fetch.assert_not_called()
+
+
 def test_success_is_allowlisted_and_persisted():
     repo = Mock()
     repo.claim_job.return_value = work()
