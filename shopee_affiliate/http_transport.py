@@ -15,6 +15,7 @@ from importlib import import_module
 from io import BytesIO
 from urllib.parse import unquote, urlsplit
 
+from .proxy_tls import proxy_ca_file
 from .response_cookies import bounded_set_cookie_headers
 
 ENDPOINT = 'https://affiliate.shopee.vn/api/v3/offer/product'
@@ -122,7 +123,26 @@ def request_product(target: str | int, *, headers: Mapping[str, str], cookie: st
     url = product_url(target)
     request_headers = _request_headers(headers, cookie)
     proxy = validate_proxy_url(proxy_url)
+    https_proxy = proxy is not None and urlsplit(proxy).scheme == 'https'
+    try:
+        ca_file = proxy_ca_file() if https_proxy else None
+    except ValueError:
+        raise TransportError('Invalid operator HTTPS proxy CA configuration', category='input') from None
     requests = _load_requests()
+    session_options = {}
+    if https_proxy:
+        try:
+            curl_options = import_module('curl_cffi.const').CurlOpt
+        except (ImportError, OSError, AttributeError):
+            raise TransportError('HTTPS proxy TLS options are unavailable', category='input') from None
+        options = {curl_options.PROXY_SSL_VERIFYPEER: 1, curl_options.PROXY_SSL_VERIFYHOST: 2}
+        if ca_file is not None:
+            # curl_cffi initializes BOTH CA paths at perform() unless CAINFO was
+            # explicitly set. Preserve its existing origin root bundle while
+            # preventing that initialization from overwriting the proxy bundle.
+            origin_ca = import_module('curl_cffi.curl').DEFAULT_CACERT
+            options = {**options, curl_options.CAINFO: origin_ca, curl_options.PROXY_CAINFO: ca_file}
+        session_options = {'curl_options': options}
     buffer, size, too_large = BytesIO(), 0, False
 
     def collect(chunk: bytes) -> int:
@@ -137,7 +157,7 @@ def request_product(target: str | int, *, headers: Mapping[str, str], cookie: st
         return len(chunk)
 
     try:
-        with requests.Session(trust_env=False) as session:
+        with requests.Session(trust_env=False, **session_options) as session:
             proxy_options = {} if proxy is None else {'proxy': proxy}
             response = session.get(url, headers=request_headers, impersonate=CHROME_PROFILE,
                 default_headers=False, timeout=20, allow_redirects=False, verify=True,

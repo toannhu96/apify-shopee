@@ -32,6 +32,68 @@ def deadline():
     return datetime.now(UTC) + timedelta(hours=1)
 
 
+def test_proxy_replacement_preserves_session_and_fences_old_work(repo):
+    account(repo)
+    repo.submit_run('proxy-change', ['123'], deadline())
+    work = repo.claim_job(reserve=reserve)
+    with repo._tx() as conn:
+        before = conn.execute("SELECT * FROM accounts WHERE alias='primary'").fetchone()
+    credentials = repo.cipher.decrypt(before['credentials'])
+    proxy = 'https://synthetic:password@proxy.example:8443'
+    assert repo.replace_proxy('primary', proxy, expected_version=1) == 2
+    with repo._tx() as conn:
+        after = conn.execute("SELECT * FROM accounts WHERE alias='primary'").fetchone()
+        job = conn.execute("SELECT * FROM jobs WHERE item_id='123'").fetchone()
+    assert repo.cipher.decrypt(after['credentials']) == {**credentials, 'proxy_url': proxy}
+    assert proxy not in after['credentials']
+    assert after['status'] == 'pending' and after['lease_token'] is None
+    assert after['next_request_at'] >= before['lease_until']
+    assert job['status'] == 'pending' and job['available_at'] >= before['lease_until']
+    assert repo.complete_job(work, result()) is False
+
+
+def test_proxy_replacement_rejects_stale_disabled_missing_and_invalid(repo):
+    account(repo)
+    proxy = 'https://proxy.example:8443'
+    with pytest.raises(Conflict):
+        repo.replace_proxy('primary', proxy, expected_version=2)
+    with pytest.raises(Missing):
+        repo.replace_proxy('missing', proxy, expected_version=1)
+    for version in (None, 0, -1, True, '1'):
+        with pytest.raises(ValueError):
+            repo.replace_proxy('primary', proxy, expected_version=version)
+    for invalid in (None, '', 'file:///tmp/proxy', 'https://proxy.example/path'):
+        with pytest.raises(ValueError):
+            repo.replace_proxy('primary', invalid, expected_version=1)
+    repo.disable_account('primary')
+    with pytest.raises(Conflict):
+        repo.replace_proxy('primary', proxy, expected_version=1)
+    assert repo.list_accounts()[0]['version'] == 1
+
+
+def test_proxy_replacement_invalidates_cached_product(repo):
+    account(repo)
+    repo.submit_run('proxy-cache', ['123'], deadline())
+    work = repo.claim_job(reserve=reserve)
+    assert repo.complete_job(work, result())
+    assert repo.replace_proxy('primary', 'https://proxy.example:8443', expected_version=1) == 2
+    with repo._tx() as conn:
+        assert conn.execute('SELECT count(*) AS n FROM product_cache').fetchone()['n'] == 0
+
+
+def test_concurrent_proxy_changes_only_one_wins(repo):
+    from concurrent.futures import ThreadPoolExecutor
+    account(repo)
+    def update(index):
+        try:
+            return repo.replace_proxy('primary', f'https://proxy{index}.example:8443', expected_version=1)
+        except Conflict:
+            return 'conflict'
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(update, [1, 2]))
+    assert sorted(outcomes, key=str) == [2, 'conflict']
+
+
 def account(repo):
     repo.replace_account('primary', {'cookie_source': 'session=synthetic', 'signing_state': {'counter': 1}, 'proxy_url': None})
     with repo._tx() as conn:

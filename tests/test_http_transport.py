@@ -191,8 +191,8 @@ def test_truncation_not_accepted_if_library_swallows_callback_exception(monkeypa
         def get(self, url, **kwargs):
             try:
                 kwargs['content_callback'](b'123456789')
-            except Exception:
-                pass
+            except transport.TransportError:
+                pass  # Simulate a library swallowing its callback error.
             return SimpleNamespace(status_code=200)
     monkeypatch.setattr(transport, '_load_requests', lambda: SimpleNamespace(Session=Session))
     with pytest.raises(transport.TransportError, match='size limit'):
@@ -223,3 +223,132 @@ def test_response_dataclass_rejects_unbounded_headers(headers):
     with pytest.raises(ValueError) as caught:
         transport.HttpResponse(200, b'{}', headers)
     assert 'secret' not in str(caught.value)
+
+
+@pytest.fixture
+def proxy_ca_file(tmp_path):
+    import re
+    from pathlib import Path
+
+    import certifi
+    cert = re.search(r'-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----',
+                     Path(certifi.where()).read_text(), re.DOTALL).group(0)
+    path = tmp_path / 'operator-ca.pem'
+    path.write_text(cert + '\n')
+    return path
+
+
+def test_explicit_https_proxy_ca_does_not_replace_origin_trust(monkeypatch, proxy_ca_file):
+    from curl_cffi.const import CurlOpt
+    from curl_cffi.curl import DEFAULT_CACERT
+    monkeypatch.setenv('SH_PROXY_CA_FILE', str(proxy_ca_file))
+    calls = mock_session(monkeypatch)
+    transport.request_product(ITEM, headers=HEADERS, cookie=COOKIE,
+                              proxy_url='https://proxy.example:8443')
+    assert calls[0] == ('session', {'trust_env': False, 'curl_options': {
+        CurlOpt.PROXY_CAINFO: str(proxy_ca_file), CurlOpt.PROXY_SSL_VERIFYPEER: 1,
+        CurlOpt.PROXY_SSL_VERIFYHOST: 2, CurlOpt.CAINFO: DEFAULT_CACERT,
+    }})
+    assert calls[1][2]['verify'] is True
+    assert calls[1][2]['proxy'] == 'https://proxy.example:8443'
+
+
+@pytest.mark.parametrize('proxy', [None, 'http://proxy.example:8080', 'socks5://proxy.example:1080'])
+def test_proxy_ca_config_not_loaded_without_https_proxy(monkeypatch, proxy):
+    monkeypatch.setenv('SH_PROXY_CA_FILE', '/missing/secret-cert-path')
+    calls = mock_session(monkeypatch)
+    transport.request_product(ITEM, headers=HEADERS, cookie=COOKIE, proxy_url=proxy)
+    assert calls[0] == ('session', {'trust_env': False})
+    assert calls[1][2]['verify'] is True
+
+
+@pytest.mark.parametrize('kind', ['missing', 'directory', 'invalid', 'empty', 'oversized', 'private_key', 'fifo', 'symlink'])
+def test_invalid_proxy_ca_fails_before_dependency_or_network(monkeypatch, tmp_path, kind):
+    import os
+    path = tmp_path / 'SECRET-private-path.pem'
+    if kind == 'directory':
+        path.mkdir()
+    elif kind == 'fifo':
+        os.mkfifo(path)
+    elif kind == 'symlink':
+        path.symlink_to(tmp_path / 'missing-target')
+    elif kind != 'missing':
+        path.write_text({'invalid': 'SECRET-not-a-cert', 'empty': '', 'oversized': 'x' * 262145,
+                         'private_key': '-----BEGIN ' + 'PRIVATE KEY-----\nSYNTHETIC\n-----END PRIVATE KEY-----'}[kind])
+    monkeypatch.setenv('SH_PROXY_CA_FILE', str(path))
+    monkeypatch.setattr(transport, '_load_requests', lambda: pytest.fail('dependency loaded'))
+    with pytest.raises(transport.TransportError) as caught:
+        transport.request_product(ITEM, headers=HEADERS, cookie=COOKIE,
+                                  proxy_url='https://user:SECRET@proxy.example:8443')
+    assert caught.value.category == 'input'
+    assert 'SECRET' not in str(caught.value)
+    assert str(path) not in str(caught.value)
+
+
+def test_proxy_ca_survives_real_curl_certificate_initialization(monkeypatch, proxy_ca_file):
+    from curl_cffi import Curl
+    from curl_cffi.const import CurlOpt
+    from curl_cffi.curl import DEFAULT_CACERT
+    monkeypatch.setenv('SH_PROXY_CA_FILE', str(proxy_ca_file))
+    calls = mock_session(monkeypatch)
+    transport.request_product(ITEM, headers=HEADERS, cookie=COOKIE,
+                              proxy_url='https://proxy.example:8443')
+    settings = {}
+    original = Curl.setopt
+    def recording_setopt(self, option, value):
+        settings[option] = value
+        return original(self, option, value)
+    monkeypatch.setattr(Curl, 'setopt', recording_setopt)
+    curl = Curl()
+    try:
+        for option, value in calls[0][1]['curl_options'].items():
+            curl.setopt(option, value)
+        curl._ensure_cacert()  # perform's local preparation, without opening a socket
+    finally:
+        curl.close()
+    assert settings[CurlOpt.PROXY_CAINFO] == str(proxy_ca_file)
+    assert settings[CurlOpt.CAINFO] == DEFAULT_CACERT
+
+
+def test_https_proxy_without_custom_ca_still_verifies_both_tls_layers(monkeypatch):
+    from curl_cffi.const import CurlOpt
+    monkeypatch.delenv('SH_PROXY_CA_FILE', raising=False)
+    calls = mock_session(monkeypatch)
+    transport.request_product(ITEM, headers=HEADERS, cookie=COOKIE,
+                              proxy_url='https://proxy.example:8443')
+    options = calls[0][1]['curl_options']
+    assert options[CurlOpt.PROXY_SSL_VERIFYPEER] == 1
+    assert options[CurlOpt.PROXY_SSL_VERIFYHOST] == 2
+    assert CurlOpt.PROXY_CAINFO not in options
+    assert calls[1][2]['verify'] is True
+
+
+@pytest.mark.parametrize('configured', ['', 'x' * 4097, 'secret\npath'])
+def test_invalid_proxy_ca_path_setting_is_redacted(monkeypatch, configured):
+    monkeypatch.setenv('SH_PROXY_CA_FILE', configured)
+    monkeypatch.setattr(transport, '_load_requests', lambda: pytest.fail('dependency loaded'))
+    with pytest.raises(transport.TransportError, match='Invalid operator HTTPS proxy CA configuration'):
+        transport.request_product(ITEM, headers=HEADERS, cookie=COOKIE, proxy_url='https://proxy.example')
+
+
+@pytest.mark.parametrize('content', ['-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----',
+    '-----BEGIN CERTIFICATE-----\n☃\n-----END CERTIFICATE-----'])
+def test_invalid_certificate_encoding_rejected_before_socket(monkeypatch, tmp_path, content):
+    path = tmp_path / 'bad.pem'
+    path.write_text(content)
+    monkeypatch.setenv('SH_PROXY_CA_FILE', str(path))
+    monkeypatch.setattr(transport, '_load_requests', lambda: pytest.fail('dependency loaded'))
+    with pytest.raises(transport.TransportError) as caught:
+        transport.request_product(ITEM, headers=HEADERS, cookie=COOKIE, proxy_url='https://proxy.example')
+    assert caught.value.category == 'input'
+
+
+def test_proxy_ca_unreadable_file_is_rejected(monkeypatch, proxy_ca_file):
+    proxy_ca_file.chmod(0)
+    monkeypatch.setenv('SH_PROXY_CA_FILE', str(proxy_ca_file))
+    try:
+        with pytest.raises(transport.TransportError) as caught:
+            transport.request_product(ITEM, headers=HEADERS, cookie=COOKIE, proxy_url='https://proxy.example')
+        assert caught.value.category == 'input'
+    finally:
+        proxy_ca_file.chmod(0o600)

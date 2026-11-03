@@ -9,7 +9,6 @@ import stat
 import sys
 import time
 from datetime import UTC, datetime
-from urllib.parse import urlsplit
 
 from .config import Settings
 from .secrets import Cipher
@@ -69,17 +68,17 @@ def _initialize(headers: dict) -> dict:
 def _proxy(path: str | None) -> str | None:
     if path is None:
         return None
-    value = _read_private(path, 8192).rstrip('\r\n')
+    return _validated_proxy(_read_private(path, 8192).rstrip('\r\n'))
+
+
+def _validated_proxy(value: str) -> str:
+    from shopee_affiliate.http_transport import validate_proxy_url
     try:
-        parsed = urlsplit(value)
-        if (not value.isascii() or any(c.isspace() for c in value)
-                or parsed.scheme not in {'http', 'https', 'socks5', 'socks5h'}
-                or not parsed.hostname or parsed.port == 0 or parsed.query or parsed.fragment
-                or parsed.path not in ('', '/')):
+        if value is None:
             raise ValueError()
+        return validate_proxy_url(value)
     except ValueError:
         raise OperatorError('Proxy configuration is invalid') from None
-    return value
 
 
 def _credentials(args) -> dict:
@@ -126,13 +125,40 @@ def _version(value: str) -> int:
     return int(value)
 
 
+def _stdin_proxy() -> str:
+    from shopee_affiliate import signed_client
+    try:
+        raw = sys.stdin.buffer.read(16385)
+        if len(raw) > 16384:
+            raise ValueError()
+        value = json.loads(raw.decode('utf-8'), object_pairs_hook=signed_client._pairs,
+                           parse_constant=signed_client._constant,
+                           parse_float=signed_client._finite_float)
+        if not isinstance(value, dict) or set(value) != {'proxy_url'}:
+            raise ValueError()
+        return _validated_proxy(value['proxy_url'])
+    except Exception:  # noqa: BLE001 - supplied credentials must never appear in errors
+        raise OperatorError('Proxy handoff is invalid or exceeds the size limit') from None
+
+
 def _refresh_stdin(args, repo):
     version = repo.replace_account(args.alias, _stdin_credentials(), require_existing=True,
                                    expected_version=args.expected_version, preserve_proxy=True, require_enabled=True)
+    _report_verification(args, repo, version)
+
+
+def _set_proxy_stdin(args, repo):
+    version = repo.replace_proxy(args.alias, _stdin_proxy(), expected_version=args.expected_version)
+    _report_verification(args, repo, version)
+
+
+def _report_verification(args, repo, version):
     ready = _wait_for_verification(repo, args.alias, version)
     accepted = ready and _verify(repo, args.alias, args.item_id)
     row = next((row for row in repo.list_accounts() if row['alias'] == args.alias), {})
     status = row.get('status', 'unavailable')
+    if status not in {'healthy', 'pending', 'authentication', 'verification', 'rate_limit', 'disabled', 'unavailable'}:
+        status = 'unavailable'
     verified = accepted is True and row.get('version') == version and status == 'healthy'
     print(json.dumps({'alias': args.alias, 'version': version, 'status': status, 'verified': verified}))
 
@@ -182,6 +208,10 @@ def _parser() -> argparse.ArgumentParser:
     refresh.add_argument('alias', type=_alias)
     refresh.add_argument('--expected-version', type=_version, required=True)
     refresh.add_argument('--item-id', type=_item, required=True)
+    proxy = commands.add_parser('set-proxy-stdin', help='Privately attach a proxy to an existing session and verify once')
+    proxy.add_argument('alias', type=_alias)
+    proxy.add_argument('--expected-version', type=_version, required=True)
+    proxy.add_argument('--item-id', type=_item, required=True)
     return parser
 
 
@@ -210,6 +240,8 @@ def _run(args, repo) -> int:
         print(f'Account {args.alias} verified and activated.')
     elif args.command == 'refresh-session-stdin':
         _refresh_stdin(args, repo)
+    elif args.command == 'set-proxy-stdin':
+        _set_proxy_stdin(args, repo)
     else:
         if args.command == 'add-account' and any(row.get('alias') == args.alias for row in repo.list_accounts()):
             raise OperatorError('Account alias already exists; use replace-session')

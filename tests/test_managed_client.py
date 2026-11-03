@@ -110,7 +110,12 @@ def test_explicit_proxy_preserves_transport_security(monkeypatch, proxy):
     calls = []
     class Session:
         def __init__(self, **kwargs):
-            assert kwargs == {'trust_env': False}
+            from curl_cffi import CurlOpt
+            expected = {'trust_env': False}
+            if proxy.startswith('https://'):
+                expected = {**expected, 'curl_options': {
+                    CurlOpt.PROXY_SSL_VERIFYPEER: 1, CurlOpt.PROXY_SSL_VERIFYHOST: 2}}
+            assert kwargs == expected
         def __enter__(self):
             return self
         def __exit__(self, *args):

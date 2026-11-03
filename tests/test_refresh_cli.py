@@ -126,3 +126,104 @@ def test_long_cooldown_stays_pending(monkeypatch):
         {'alias': 'primary', 'version': 3, 'status': 'pending',
          'next_request_at': datetime.now(UTC) + timedelta(hours=1)}])
     assert not cli._wait_for_verification(repo, 'primary', 3)
+
+
+def run_proxy():
+    return cli.main(['set-proxy-stdin', 'primary', '--expected-version', '2',
+                     '--item-id', '24995347301'])
+
+
+def setup_proxy(monkeypatch, raw=None):
+    repo = setup(monkeypatch, raw=raw if raw is not None else
+                 b'{"proxy_url":"https://synthetic-user:synthetic-password@proxy.invalid:443"}')
+    calls = []
+    def replace_proxy(alias, proxy_url, **kwargs):
+        calls.append((alias, proxy_url, kwargs))
+        return 3
+    monkeypatch.setattr(repo, 'replace_proxy', replace_proxy, raising=False)
+    return repo, calls
+
+
+def test_private_proxy_handoff_uses_atomic_repository_helper_and_verifies_once(monkeypatch, capsys):
+    repo, calls = setup_proxy(monkeypatch)
+    verifies = []
+    def verify(*args):
+        verifies.append(args)
+        repo.status = 'healthy'
+        return True
+    monkeypatch.setattr(cli, '_verify', verify)
+    assert run_proxy() == 0
+    assert calls == [('primary', 'https://synthetic-user:synthetic-password@proxy.invalid:443',
+                      {'expected_version': 2})]
+    assert not repo.calls
+    assert verifies == [(repo, 'primary', '24995347301')]
+    output = capsys.readouterr()
+    assert not output.err
+    assert json.loads(output.out) == {
+        'alias': 'primary', 'version': 3, 'status': 'healthy', 'verified': True}
+    assert 'synthetic-password' not in output.out
+
+
+@pytest.mark.parametrize('raw', [
+    b'[]', b'{}', b'{"proxy_url":"https://proxy.invalid","extra":1}',
+    b'{"proxy_url":"https://proxy.invalid","proxy_url":"https://other.invalid"}',
+    b'{"proxy_url":NaN}', b'\xff', b'x' * 16385,
+    b'{"proxy_url":null}', b'{"proxy_url":[]}',
+    b'{"proxy_url":"file:///secret"}', b'{"proxy_url":"http://"}',
+    b'{"proxy_url":"https://proxy.invalid:0"}',
+    b'{"proxy_url":"https://proxy.invalid:99999"}',
+    b'{"proxy_url":"https://proxy.invalid/path"}',
+    b'{"proxy_url":"https://proxy.invalid?secret=1"}',
+    b'{"proxy_url":"https://proxy.invalid#secret"}',
+    b'{"proxy_url":" https://proxy.invalid"}',
+    b'{"proxy_url":"https://proxy.invalid/\\u0000"}',
+    b'{"proxy_url":"https://proxy.invalid/\\u007f"}',
+    b'{"proxy_url":"https://pr\\u00f6xy.invalid"}',
+    b'{"proxy_url":"https://user:password%0d%0a@proxy.invalid"}',
+    json.dumps({'proxy_url': 'https://' + 'u' * 4075 + ':p@proxy.invalid'}).encode(),
+    json.dumps({'proxy_url': 'https://' + 'u' * 8192 + ':secret@proxy.invalid'}).encode(),
+])
+def test_invalid_proxy_stdin_never_mutates_verifies_or_leaks(monkeypatch, capsys, raw):
+    repo, calls = setup_proxy(monkeypatch, raw)
+    monkeypatch.setattr(cli, '_verify', lambda *args: pytest.fail('Must not verify'))
+    assert run_proxy() == 1
+    assert not calls and not repo.calls
+    output = capsys.readouterr()
+    assert not output.out and output.err == 'Proxy handoff is invalid or exceeds the size limit\n'
+
+
+@pytest.mark.parametrize('exception', ['conflict', 'missing', 'disabled'])
+def test_proxy_cas_rejection_never_verifies_or_leaks(monkeypatch, capsys, exception):
+    from shopee_service.repository import Conflict, Missing
+    repo, _ = setup_proxy(monkeypatch)
+    def reject(*args, **kwargs):
+        raise (Missing if exception == 'missing' else Conflict)('synthetic-password')
+    monkeypatch.setattr(repo, 'replace_proxy', reject)
+    monkeypatch.setattr(cli, '_verify', lambda *args: pytest.fail('Must not verify'))
+    assert run_proxy() == 1
+    output = capsys.readouterr()
+    assert not output.out and 'synthetic-password' not in output.err
+
+
+def test_proxy_cooldown_does_not_verify(monkeypatch, capsys):
+    _repo, calls = setup_proxy(monkeypatch)
+    monkeypatch.setattr(cli, '_wait_for_verification', lambda *args: False)
+    monkeypatch.setattr(cli, '_verify', lambda *args: pytest.fail('Must not verify'))
+    assert run_proxy() == 0
+    assert len(calls) == 1
+    assert json.loads(capsys.readouterr().out)['verified'] is False
+
+
+def test_proxy_output_rejects_unexpected_status(monkeypatch, capsys):
+    repo, _ = setup_proxy(monkeypatch)
+    repo.status = 'synthetic-password'
+    assert run_proxy() == 0
+    assert json.loads(capsys.readouterr().out) == {
+        'alias': 'primary', 'version': 3, 'status': 'unavailable', 'verified': False}
+
+
+@pytest.mark.parametrize('version', ['0', '-1', '1.5'])
+def test_proxy_version_required_positive(version):
+    with pytest.raises(SystemExit):
+        cli._parser().parse_args(['set-proxy-stdin', 'primary', '--expected-version', version,
+                                 '--item-id', '123'])

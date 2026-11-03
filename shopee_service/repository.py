@@ -219,15 +219,37 @@ class Repository:
             if preserve_proxy:
                 current = self.cipher.decrypt(exists['credentials'])
                 updated = {**credentials, 'proxy_url': current.get('proxy_url')}
-            encrypted = self.cipher.encrypt(updated)
-            row = conn.execute("INSERT INTO accounts(alias,status,credentials) VALUES(%s,'pending',%s) "
-                               "ON CONFLICT(alias) DO UPDATE SET version=accounts.version+1,status='pending',"
-                               "credentials=EXCLUDED.credentials,updated_at=now(),next_request_at=GREATEST(accounts.next_request_at,accounts.lease_until,now()),lease_token=NULL,lease_until=NULL "
-                               'RETURNING version', (alias, encrypted)).fetchone()
-            conn.execute('DELETE FROM product_cache WHERE account_alias=%s', (alias,))
-            conn.execute("UPDATE jobs SET status='pending',lease_token=NULL,available_at=GREATEST(now(),lease_until) "
-                         'WHERE account_alias=%s', (alias,))
-            return row['version']
+            return self._replace_credentials(conn, alias, updated)
+
+    def _replace_credentials(self, conn, alias, credentials):
+        encrypted = self.cipher.encrypt(credentials)
+        row = conn.execute("INSERT INTO accounts(alias,status,credentials) VALUES(%s,'pending',%s) "
+                           "ON CONFLICT(alias) DO UPDATE SET version=accounts.version+1,status='pending',"
+                           "credentials=EXCLUDED.credentials,updated_at=now(),next_request_at=GREATEST(accounts.next_request_at,accounts.lease_until,now()),lease_token=NULL,lease_until=NULL "
+                           'RETURNING version', (alias, encrypted)).fetchone()
+        conn.execute('DELETE FROM product_cache WHERE account_alias=%s', (alias,))
+        conn.execute("UPDATE jobs SET status='pending',lease_token=NULL,available_at=GREATEST(now(),lease_until) "
+                     'WHERE account_alias=%s', (alias,))
+        return row['version']
+
+    def replace_proxy(self, alias, proxy_url, *, expected_version):
+        """Change only an enabled account's proxy under the session-version fence."""
+        from shopee_affiliate.http_transport import validate_proxy_url
+        _id(alias, ALIAS)
+        if type(expected_version) is not int or expected_version < 1 or not isinstance(proxy_url, str):
+            raise ValueError('Invalid proxy replacement configuration')
+        validate_proxy_url(proxy_url)
+        with self._tx() as conn:
+            current = conn.execute('SELECT version,status,credentials FROM accounts WHERE alias=%s FOR UPDATE',
+                                   (alias,)).fetchone()
+            if not current:
+                raise Missing('Account alias does not exist')
+            if current['version'] != expected_version:
+                raise Conflict('Account session changed during proxy replacement')
+            if current['status'] == 'disabled':
+                raise Conflict('Account was disabled during proxy replacement')
+            credentials = self.cipher.decrypt(current['credentials'])
+            return self._replace_credentials(conn, alias, {**credentials, 'proxy_url': proxy_url})
 
     def disable_account(self, alias):
         _id(alias, ALIAS)

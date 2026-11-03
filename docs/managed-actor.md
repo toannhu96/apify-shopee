@@ -168,6 +168,29 @@ protected files with `replace-session primary`; then verify it again. Use
 contains a protected operator-controlled proxy URL; customers cannot supply proxies.
 Replacing a session creates a new version and invalidates that account's cache.
 
+To change only the outbound proxy, pass a protected JSON file containing exactly
+`{"proxy_url":"https://user:password@proxy.example:8443"}` to the private CLI:
+
+```sh
+docker exec -i SERVICE_CONTAINER python -m shopee_service.cli set-proxy-stdin primary \
+  --expected-version CURRENT_VERSION --item-id 24995347301 < /protected/proxy.json
+```
+
+Use the version from `list-accounts`. This operation preserves the stored cookies
+and signing state, atomically rejects stale versions or disabled accounts,
+invalidates cached results, and performs one verification request after any
+existing pacing or lease delay. Credentials stay in encrypted account storage;
+they are never accepted through public Actor inputs or an HTTP administration route.
+An unsuccessful verification leaves the account paused.
+
+For an explicitly trusted private HTTPS proxy certificate, mount its PEM bundle
+read-only and set `SH_PROXY_CA_FILE` to the container path. The bundle must be a
+regular, readable PEM file of at most 256 KiB, not a symlink. This setting applies
+only to an explicit HTTPS proxy: proxy peer/hostname verification and normal
+Shopee HTTPS verification remain enabled. It does not install global trust or
+disable certificate checks. A working proxy does not guarantee that Shopee will
+accept the account session.
+
 An authentication or verification incident pauses the account. Discord reports
 the alias and safe action, never cookies, headers, raw responses or webhook URLs.
 Rate limits cool down for 15 minutes and are not described as expired sessions.
