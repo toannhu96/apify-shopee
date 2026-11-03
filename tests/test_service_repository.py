@@ -32,6 +32,41 @@ def deadline():
     return datetime.now(UTC) + timedelta(hours=1)
 
 
+def test_standalone_seed_reservations_persist_and_keep_original_seed(repo, monkeypatch):
+    import json
+    from pathlib import Path
+
+    from shopee_affiliate import managed_signing, sap_signer
+    headers = json.loads((Path(__file__).parent / 'fixtures/sap_root_refresh_golden.json').read_text())['before_headers']
+    headers = {**headers, 'af-ac-enc-sz-token': 'synthetic-token', 'user-agent': 'Synthetic fixture',
+               'x-sz-sdk-version': '1.12.21'}
+    state = managed_signing.initialize(headers, mode='standalone-seed')
+    calls = []
+    def sign(item, seed):
+        calls.append((item, dict(seed)))
+        return dict(seed)
+    monkeypatch.setattr(sap_signer, 'refresh_headers', sign)
+    repo.replace_account('primary', {'cookie_source': 'session=synthetic', 'signing_state': state})
+    first = repo.claim_verification('primary', '123')
+    with repo._tx() as conn:
+        stored = conn.execute("SELECT credentials FROM accounts WHERE alias='primary'").fetchone()
+    reserved = repo.cipher.decrypt(stored['credentials'])['signing_state']
+    assert reserved['sequence'] == 1 and reserved['seed_headers'] == state['seed_headers']
+    assert repo.complete_verification(first, response_received=True)
+    with repo._tx() as conn:
+        conn.execute("UPDATE accounts SET next_request_at=now() WHERE alias='primary'")
+    repo.submit_run('standalone-second', ['456'], deadline())
+    second = repo.claim_job()
+    assert second and [item for item, _ in calls] == ['123', '456']
+    assert all(seed == state['seed_headers'] for _, seed in calls)
+    assert repo.complete_job(second, result(), response_received=True)
+    with repo._tx() as conn:
+        stored = conn.execute("SELECT credentials FROM accounts WHERE alias='primary'").fetchone()
+    completed = repo.cipher.decrypt(stored['credentials'])['signing_state']
+    assert completed['sequence'] == 2 and completed['response_count'] == 2
+    assert completed['seed_headers'] == state['seed_headers']
+
+
 def test_proxy_replacement_preserves_session_and_fences_old_work(repo):
     account(repo)
     repo.submit_run('proxy-change', ['123'], deadline())

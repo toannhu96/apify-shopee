@@ -187,6 +187,15 @@ existing pacing or lease delay. Credentials stay in encrypted account storage;
 they are never accepted through public Actor inputs or an HTTP administration route.
 An unsuccessful verification leaves the account paused.
 
+When importing cookie and seed files that work with `shopee_affiliate.signed_client`,
+use `refresh-session-stdin ... --signing-mode standalone-seed` to match its signing
+behavior. Each reserved request calls the same `sap_signer.refresh_headers` with
+the original imported headers. The service persists the reservation before HTTP
+dispatch; response bookkeeping does not advance that original seed. Response
+cookies still update under the account-version fence. The default `cumulative`
+mode retains the existing chained signing lifecycle. Proxy/egress acceptance is
+independent of the chosen signing mode.
+
 For an explicitly trusted private HTTPS proxy certificate, mount its PEM bundle
 read-only and set `SH_PROXY_CA_FILE` to the container path. The bundle must be a
 regular, readable PEM file of at most 256 KiB, not a symlink. This setting applies

@@ -275,7 +275,7 @@ class Repository:
 
     def claim_job(self, *, reserve=None):
         if reserve is None:
-            from shopee_affiliate.session_signer import reserve_request
+            from shopee_affiliate.managed_signing import reserve_request
             reserve = reserve_request
         with self._tx() as conn:
             self._maintenance(conn)
@@ -345,8 +345,8 @@ class Repository:
 
     def _record_response(self, conn, work, response_cookie_source=None):
         """Commit response cookies and counters inside the fenced outcome transaction."""
+        from shopee_affiliate.managed_signing import record_response
         from shopee_affiliate.response_cookies import validate_response_cookie_source
-        from shopee_affiliate.session_signer import record_response
         row = conn.execute('SELECT credentials FROM accounts WHERE alias=%s', (work.account_alias,)).fetchone()
         credentials = self.cipher.decrypt(row['credentials'])
         updated = {**credentials, 'signing_state': record_response(credentials['signing_state'])}
@@ -421,7 +421,7 @@ class Repository:
         _id(alias, ALIAS)
         _id(item_id, ITEM_ID)
         if reserve is None:
-            from shopee_affiliate.session_signer import reserve_request
+            from shopee_affiliate.managed_signing import reserve_request
             reserve = reserve_request
         with self._tx() as conn:
             self._maintenance(conn)

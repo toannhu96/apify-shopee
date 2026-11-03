@@ -227,3 +227,79 @@ def test_proxy_version_required_positive(version):
     with pytest.raises(SystemExit):
         cli._parser().parse_args(['set-proxy-stdin', 'primary', '--expected-version', version,
                                  '--item-id', '123'])
+
+
+@pytest.mark.parametrize('mode', [None, 'cumulative', 'standalone-seed'])
+def test_refresh_signing_mode_parser(mode):
+    args = ['refresh-session-stdin', 'primary', '--expected-version', '2', '--item-id', '123']
+    parsed = cli._parser().parse_args(args + ([] if mode is None else ['--signing-mode', mode]))
+    assert parsed.signing_mode == (mode or 'cumulative')
+
+
+@pytest.mark.parametrize('command, mode', [('refresh-session-stdin', 'unknown'),
+    ('set-proxy-stdin', 'standalone-seed')])
+def test_signing_mode_is_scoped_and_validated(command, mode):
+    with pytest.raises(SystemExit):
+        cli._parser().parse_args([command, 'primary', '--expected-version', '2',
+                                 '--item-id', '123', '--signing-mode', mode])
+
+
+def test_explicit_standalone_seed_initializes_dispatcher_and_preserves_cas(monkeypatch, capsys):
+    from shopee_affiliate import managed_signing
+    repo = setup(monkeypatch)
+    calls = []
+    state = {'mode': 'standalone_seed', 'synthetic_state': True}
+    def initialize(headers, *, mode):
+        calls.append((headers, mode))
+        return state
+    monkeypatch.setattr(managed_signing, 'initialize', initialize)
+    monkeypatch.setattr(cli, '_initialize', lambda *args: pytest.fail('Cumulative initialization called'))
+    assert cli.main(['refresh-session-stdin', 'primary', '--expected-version', '2',
+                     '--item-id', '24995347301', '--signing-mode', 'standalone-seed']) == 0
+    assert calls == [({key.lower(): value for key, value in seed().items()}, 'standalone-seed')]
+    assert repo.calls[0][1] == {'cookie_source': 'session=private-cookie', 'signing_state': state}
+    assert repo.calls[0][2] == {'require_existing': True, 'expected_version': 2,
+                              'preserve_proxy': True, 'require_enabled': True}
+    assert json.loads(capsys.readouterr().out) == {
+        'alias': 'primary', 'version': 3, 'status': 'healthy', 'verified': True}
+
+
+def test_explicit_cumulative_mode_retains_existing_initialization(monkeypatch, capsys):
+    repo = setup(monkeypatch)
+    assert cli.main(['refresh-session-stdin', 'primary', '--expected-version', '2',
+                     '--item-id', '24995347301', '--signing-mode', 'cumulative']) == 0
+    assert repo.calls[0][1]['signing_state'] == cli._initialize(seed())
+    assert json.loads(capsys.readouterr().out)['verified'] is True
+
+
+def test_programmatic_invalid_signing_mode_is_redacted(monkeypatch):
+    repo = setup(monkeypatch)
+    with pytest.raises(cli.OperatorError, match='Session handoff is invalid') as caught:
+        cli._stdin_credentials(mode='secret-invalid-mode')
+    assert 'secret' not in str(caught.value)
+    assert not repo.calls
+
+
+def test_standalone_initialization_failure_does_not_mutate_or_leak(monkeypatch, capsys):
+    from shopee_affiliate import managed_signing
+    repo = setup(monkeypatch)
+    def initialize(*args, **kwargs):
+        raise ValueError('PRIVATE-SIGNING-SECRET')
+    monkeypatch.setattr(managed_signing, 'initialize', initialize)
+    monkeypatch.setattr(cli, '_verify', lambda *args: pytest.fail('Must not verify'))
+    assert cli.main(['refresh-session-stdin', 'primary', '--expected-version', '2',
+                     '--item-id', '24995347301', '--signing-mode', 'standalone-seed']) == 1
+    assert not repo.calls
+    output = capsys.readouterr()
+    assert not output.out
+    assert output.err == 'Session handoff is invalid or exceeds the size limit\n'
+
+
+def test_standalone_cli_import_preserves_original_seed_without_synthetic_response(monkeypatch):
+    setup(monkeypatch)
+    credentials = cli._stdin_credentials(mode='standalone-seed')
+    state = credentials['signing_state']
+    assert state['mode'] == 'standalone_seed'
+    assert state['seed_headers'] == {key.lower(): value for key, value in seed().items()}
+    assert state['sequence'] == state['response_count'] == 0
+    assert state['last_headers'] is None

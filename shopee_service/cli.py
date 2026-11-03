@@ -100,7 +100,7 @@ def _repository():
                       lease_seconds=settings.lease_seconds)
 
 
-def _stdin_credentials() -> dict:
+def _stdin_credentials(mode: str = 'cumulative') -> dict:
     from shopee_affiliate import signed_client
     maximum = 2 * signed_client.MAX_COOKIE_INPUT_BYTES
     try:
@@ -114,7 +114,14 @@ def _stdin_credentials() -> dict:
             raise ValueError()
         signed_client._cookie_header(value['cookie_source'])
         headers = signed_client._normalized_headers(value['headers'])
-        return {'cookie_source': value['cookie_source'], 'signing_state': _initialize(headers)}
+        if mode == 'cumulative':
+            signing_state = _initialize(headers)
+        elif mode == 'standalone-seed':
+            from shopee_affiliate.managed_signing import initialize
+            signing_state = initialize(headers, mode=mode)
+        else:
+            raise ValueError()
+        return {'cookie_source': value['cookie_source'], 'signing_state': signing_state}
     except Exception:  # noqa: BLE001 - untrusted credential input must never appear in errors
         raise OperatorError('Session handoff is invalid or exceeds the size limit') from None
 
@@ -142,7 +149,7 @@ def _stdin_proxy() -> str:
 
 
 def _refresh_stdin(args, repo):
-    version = repo.replace_account(args.alias, _stdin_credentials(), require_existing=True,
+    version = repo.replace_account(args.alias, _stdin_credentials(args.signing_mode), require_existing=True,
                                    expected_version=args.expected_version, preserve_proxy=True, require_enabled=True)
     _report_verification(args, repo, version)
 
@@ -208,6 +215,8 @@ def _parser() -> argparse.ArgumentParser:
     refresh.add_argument('alias', type=_alias)
     refresh.add_argument('--expected-version', type=_version, required=True)
     refresh.add_argument('--item-id', type=_item, required=True)
+    refresh.add_argument('--signing-mode', choices=('cumulative', 'standalone-seed'), default='cumulative',
+                         help='Signing lifecycle for this session (default: cumulative)')
     proxy = commands.add_parser('set-proxy-stdin', help='Privately attach a proxy to an existing session and verify once')
     proxy.add_argument('alias', type=_alias)
     proxy.add_argument('--expected-version', type=_version, required=True)
