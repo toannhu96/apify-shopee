@@ -114,6 +114,22 @@ def test_alert_success_disables_mentions_and_waits_for_delivery():
     assert 'allowed_mentions' not in repo.alert['payload']
 
 
+def test_queued_recovery_alert_is_consumed_without_sending():
+    repo, client = FakeRepo(), FakeClient()
+    repo.alert = {**repo.alert, 'dedupe_key': 'primary:1:recovery'}
+    assert dispatch_one(repo, WEBHOOK, client=client)
+    assert client.calls == []
+    assert repo.finished == [((1, 'lease'), {})]
+
+
+@pytest.mark.parametrize('status', ['authentication', 'verification', 'rate_limit'])
+def test_incident_alerts_still_send(status):
+    repo, client = FakeRepo(), FakeClient()
+    repo.alert = {**repo.alert, 'dedupe_key': f'primary:1:1:{status}'}
+    assert dispatch_one(repo, WEBHOOK, client=client)
+    assert len(client.calls) == 1
+
+
 @pytest.mark.parametrize('status,payload,headers,delay', [
     (429, {'retry_after': 12.5}, {}, 12.5),
     (429, {}, {'Retry-After': '25'}, 25),

@@ -451,10 +451,8 @@ class Repository:
                 self._record_response(conn, work, response_cookie_source)
             if result is not None:
                 self._cache_product(conn, work, result)
-            row = conn.execute("UPDATE accounts SET status='healthy',updated_at=now() WHERE alias=%s RETURNING updated_at", (work.account_alias,)).fetchone()
+            conn.execute("UPDATE accounts SET status='healthy',updated_at=now() WHERE alias=%s", (work.account_alias,))
             self._release(conn, work)
-            self._alert(conn, f'{work.account_alias}:{work.account_version}:recovery',
-                        f'Shopee account {work.account_alias}: session validated and available.', row['updated_at'])
             return True
 
     def fail_verification(self, work, code, *, response_received=False, response_cookie_source=None):

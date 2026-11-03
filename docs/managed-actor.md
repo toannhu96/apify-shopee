@@ -39,13 +39,63 @@ Run the complete suite with that variable set, then check coverage:
 .venv/bin/python -m coverage run --source=shopee_actor,shopee_service,shopee_contracts,shopee_affiliate.session_signer -m pytest -q
 .venv/bin/python -m coverage report --fail-under=80
 .venv/bin/python -m pip_audit -r requirements-actor.txt -r requirements-service.txt
-docker build -f deploy/Dockerfile -t shopee-managed-service:local .
+docker build -f deploy/Dockerfile.api -t shopee-api:local .
+docker build -f deploy/Dockerfile.worker -t shopee-worker:local .
 docker build -f .actor/Dockerfile -t shopee-product-actor:local .
 ```
 
 The two runtime requirement files pin the resolved dependency trees. Re-resolve,
 audit and test when upgrading dependencies or base-image digests. Runtime images
 exclude development tests, browser profiles, local outputs and credentials.
+
+### GitHub Actions and container images
+
+The API and worker each have their own Dockerfile and independent GitHub workflow:
+
+| Image | Dockerfile | Workflow |
+| --- | --- | --- |
+| `shopee-api` | `deploy/Dockerfile.api` | `.github/workflows/docker-api.yml` |
+| `shopee-worker` | `deploy/Dockerfile.worker` | `.github/workflows/docker-worker.yml` |
+
+Each workflow runs on pushes to `main` and manual dispatches. The publish job
+builds and pushes its image directly. Python tests, linting, coverage and dependency
+audits are run locally using the development commands above, not in these
+workflows. GitHub Actions are pinned to commit SHAs. Action and Docker base-image
+updates are managed manually.
+
+Only successful runs on `main` publish images: `ghcr.io/<owner>/shopee-api`,
+`ghcr.io/<owner>/shopee-worker`. The owner is
+lowercased. Each image receives `latest` and `sha-<full-commit>` tags, build
+provenance and an SBOM. Images retain the existing `linux/arm64` deployment
+architecture and build on native ARM runners. They are not x86 images.
+Apify continues to use `.actor/actor.json` and `.actor/Dockerfile` separately.
+
+The API and worker Dockerfiles each define their own startup command and can be
+built directly without a target flag. Compose builds the two separate images;
+its shared settings only cover runtime configuration. Both run as UID/GID 10001.
+Application code stays root-owned; the Actor's `/app/storage` is writable.
+Configure the API's `/health` probe in the deployment platform; Compose already
+does this. Runtime credentials must come from secret files or runtime environment
+variables, never image build arguments.
+
+Optional CapRover deployment lives inside each service's workflow; no separate
+`deployment.yaml` is used. Deployment is disabled until the repository variable
+`CAPROVER_DEPLOY` is set to `true`. First configure the `production` GitHub
+environment and its protection rules, then add `CAPROVER_HOST`,
+`CAPROVER_API_APP`, `CAPROVER_API_APP_TOKEN`, `CAPROVER_WORKER_APP`, and
+`CAPROVER_WORKER_APP_TOKEN` as environment secrets. The API workflow only deploys
+the API app, and the worker workflow only deploys the worker app. These must
+identify this project's apps, not the copied Nudgen app settings. Configure
+CapRover's GHCR pull credentials for private images, port 8000 for the API, and
+the runtime secrets/database for both apps. The worker image already has the
+worker command. Deployment uses the commit tag and does not run migrations.
+After a successful deployment, each workflow sends a Discord notification with
+the image name, full GHCR commit tag and commit message. Set `DISCORD_WEBHOOK`
+as a repository or `production` environment secret to enable notifications; an
+unset webhook skips the notification. Mentions are disabled and messages are
+limited to 2,000 characters. Provision the schema with the server setup steps before
+enabling deployment; schema changes still require a coordinated migration and
+rollback plan.
 
 ## Server setup
 
@@ -209,7 +259,8 @@ accept the account session.
 An authentication or verification incident pauses the account. Discord reports
 the alias and safe action, never cookies, headers, raw responses or webhook URLs.
 Rate limits cool down for 15 minutes and are not described as expired sessions.
-Successful verification generates one recovery notification per session version.
+Successful verification is silent. Previously queued recovery notifications are
+consumed without sending; only failure and session incidents notify Discord.
 Notifications use a durable outbox with bounded retries and disabled mentions.
 Inspect failed outbox rows locally if webhook delivery is rejected or retries are
 exhausted; restore the webhook and reschedule those rows deliberately.

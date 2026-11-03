@@ -374,7 +374,7 @@ def test_failed_verification_does_not_create_cached_product(repo):
     assert repo.submit_run('failed', ['123'], deadline())['results'][0]['errorCode'] == 'session_unavailable'
 
 
-def test_pending_account_verification_fencing_and_recovery_alert(repo):
+def test_pending_account_verification_fencing_without_recovery_alert(repo):
     version = repo.replace_account('primary', {'cookie_source':'synthetic=1', 'signing_state':{'counter':1},'proxy_url':None})
     assert version == 1
     work = repo.claim_verification('primary', '123', reserve=reserve)
@@ -383,15 +383,6 @@ def test_pending_account_verification_fencing_and_recovery_alert(repo):
     assert repo.complete_verification(work)
     assert repo.list_accounts()[0]['status'] == 'healthy'
     assert repo.complete_verification(work) is False
-    alert = repo.claim_alert()
-    assert 'validated' in alert['payload']['content']
-    repo.finish_alert(alert['id'], alert['lease_token'], error='delivery_failed', retry_after=1)
-    assert repo.claim_alert() is None
-    with repo._tx() as conn:
-        conn.execute('UPDATE alert_outbox SET available_at=now()')
-    retry = repo.claim_alert()
-    assert retry['attempts'] == 2
-    repo.finish_alert(retry['id'],retry['lease_token'],error='delivery_rejected')
     assert repo.claim_alert() is None
     repo.disable_account('primary')
     with repo._tx() as conn:
@@ -402,6 +393,22 @@ def test_pending_account_verification_fencing_and_recovery_alert(repo):
         repo.disable_account('absent')
     with pytest.raises(Missing):
         repo.claim_verification('absent','123',reserve=reserve)
+
+
+def test_incident_alert_retry_and_rejection(repo):
+    account(repo)
+    work = repo.claim_verification('primary', '123', reserve=reserve)
+    assert repo.fail_verification(work, 'authentication')
+    alert = repo.claim_alert()
+    assert 'authentication' in alert['payload']['content']
+    repo.finish_alert(alert['id'], alert['lease_token'], error='delivery_failed', retry_after=1)
+    assert repo.claim_alert() is None
+    with repo._tx() as conn:
+        conn.execute('UPDATE alert_outbox SET available_at=now()')
+    retry = repo.claim_alert()
+    assert retry['attempts'] == 2
+    repo.finish_alert(retry['id'],retry['lease_token'],error='delivery_rejected')
+    assert repo.claim_alert() is None
 
 
 def test_failed_verification_and_corrupt_signer_pause_account(repo):
@@ -517,7 +524,7 @@ def test_simultaneous_account_creates_cannot_replace_first_session(repo):
 def test_alert_time_matches_persisted_account_transition(repo):
     account(repo)
     work = repo.claim_verification('primary','123',reserve=reserve)
-    assert repo.complete_verification(work)
+    assert repo.fail_verification(work, 'authentication')
     alert = repo.claim_alert()
     timestamp = repo.list_accounts()[0]['updated_at'].astimezone(UTC).isoformat()
     assert 'Time: ' + timestamp in alert['payload']['content']

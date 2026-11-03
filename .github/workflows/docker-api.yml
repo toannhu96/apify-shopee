@@ -1,0 +1,114 @@
+name: Docker Shopee API
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: shopee-api
+
+jobs:
+  publish:
+    name: Build and publish api
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_name: ${{ steps.image.outputs.name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Compute repository image name
+        id: image
+        run: echo "name=${REGISTRY}/${GITHUB_REPOSITORY_OWNER,,}/${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+      - name: Log in to GHCR
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Generate image tags and labels
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=sha-,format=long
+      - name: Build and publish image with provenance and SBOM
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/Dockerfile.api
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: mode=min
+          sbom: true
+          cache-from: type=gha,scope=api-arm64
+          cache-to: type=gha,scope=api-arm64,mode=max
+
+  deploy:
+    name: Deploy api to CapRover
+    needs: publish
+    if: github.ref == 'refs/heads/main' && vars.CAPROVER_DEPLOY == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Install CapRover CLI without deployment credentials
+        run: npm install --global --ignore-scripts caprover@2.3.1
+      - name: Deploy commit image
+        env:
+          CAPROVER_URL: ${{ secrets.CAPROVER_HOST }}
+          CAPROVER_APP: ${{ secrets.CAPROVER_API_APP }}
+          CAPROVER_APP_TOKEN: ${{ secrets.CAPROVER_API_APP_TOKEN }}
+        run: |
+          : "${CAPROVER_URL:?Configure CAPROVER_HOST in the production environment}"
+          : "${CAPROVER_APP:?Configure the production CapRover app name}"
+          : "${CAPROVER_APP_TOKEN:?Configure the production CapRover app token}"
+          export CAPROVER_IMAGE_NAME="${REGISTRY}/${GITHUB_REPOSITORY_OWNER,,}/${IMAGE_NAME}:sha-${GITHUB_SHA}"
+          caprover deploy
+
+      - name: Discord notification
+        timeout-minutes: 1
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          DISCORD_MESSAGE: >-
+            Built and deployed new image `${{ env.IMAGE_NAME }}` at
+            `${{ needs.publish.outputs.image_name }}:sha-${{ github.sha }}`
+            commit `${{ github.event.head_commit.message || github.sha }}`
+        run: |
+          if [ -z "$DISCORD_WEBHOOK" ]; then
+            echo "DISCORD_WEBHOOK is not configured; skipping Discord notification."
+            exit 0
+          fi
+
+          jq -n --arg content "$DISCORD_MESSAGE" \
+            '{content: ($content | .[0:2000]), allowed_mentions: {parse: []}}' \
+            | curl --fail --silent --show-error \
+              --connect-timeout 10 --max-time 30 \
+              --header "Content-Type: application/json" \
+              --data @- --output /dev/null \
+              "$DISCORD_WEBHOOK"

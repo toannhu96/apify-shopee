@@ -75,6 +75,10 @@ def dispatch_one(repo, webhook: str | None, *, client=None) -> bool:
     alert = repo.claim_alert()
     if alert is None:
         return False
+    # Consume success notifications queued by older workers without posting them.
+    if alert.get('dedupe_key', '').endswith(':recovery'):
+        repo.finish_alert(alert['id'], alert['lease_token'])
+        return True
     if client is None:
         import httpx
         with httpx.Client(trust_env=False) as transport:
