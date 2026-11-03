@@ -169,7 +169,11 @@ contains a protected operator-controlled proxy URL; customers cannot supply prox
 Replacing a session creates a new version and invalidates that account's cache.
 
 To change only the outbound proxy, pass a protected JSON file containing exactly
-`{"proxy_url":"https://user:password@proxy.example:8443"}` to the private CLI:
+`{"proxy_url":"https://USER:PASSWORD@proxy.nudgen.net:8443"}` to the private CLI.
+The managed deployment uses `proxy.nudgen.net:8443`; replace only the host when
+updating an existing protected proxy URL, retaining its configured credentials.
+The runtime reads the encrypted account configuration, so changing this endpoint
+does not require embedding a proxy address or credentials in application code:
 
 ```sh
 docker exec -i SERVICE_CONTAINER python -m shopee_service.cli set-proxy-stdin primary \
