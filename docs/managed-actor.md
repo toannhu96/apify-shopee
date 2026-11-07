@@ -78,12 +78,13 @@ Configure the API's `/health` probe in the deployment platform; Compose already
 does this. Runtime credentials must come from secret files or runtime environment
 variables, never image build arguments.
 
-Optional CapRover deployment lives inside each service's workflow; no separate
-`deployment.yaml` is used. Deployment is disabled until the repository variable
-`CAPROVER_DEPLOY` is set to `true`. First configure the `production` GitHub
-environment and its protection rules, then add `CAPROVER_HOST`,
+CapRover deployment lives inside each service's workflow; no separate
+`deployment.yaml` is used. After a successful image publish on `main`, deployment
+runs automatically; no `CAPROVER_DEPLOY` variable is required. First configure
+the `production` GitHub environment and its protection rules, then add `CAPROVER_HOST`,
 `CAPROVER_API_APP`, `CAPROVER_API_APP_TOKEN`, `CAPROVER_WORKER_APP`, and
-`CAPROVER_WORKER_APP_TOKEN` as environment secrets. The API workflow only deploys
+`CAPROVER_WORKER_APP_TOKEN` as repository or `production` environment secrets.
+The API workflow only deploys
 the API app, and the worker workflow only deploys the worker app. These must
 identify this project's apps, not the copied Nudgen app settings. Configure
 CapRover's GHCR pull credentials for private images, port 8000 for the API, and
@@ -94,8 +95,8 @@ the image name, full GHCR commit tag and commit message. Set `DISCORD_WEBHOOK`
 as a repository or `production` environment secret to enable notifications; an
 unset webhook skips the notification. Mentions are disabled and messages are
 limited to 2,000 characters. Provision the schema with the server setup steps before
-enabling deployment; schema changes still require a coordinated migration and
-rollback plan.
+running these workflows on `main`; schema changes still require a coordinated
+migration and rollback plan.
 
 ## Server setup
 
