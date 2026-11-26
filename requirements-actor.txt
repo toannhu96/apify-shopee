@@ -11,7 +11,7 @@ cffi==2.1.1
 colorama==0.4.6
 crawlee==1.11.0
 cryptography==50.0.2
-dnspython==2.9.0
+dnspython==2.9.2
 email-validator==2.3.0
 h11==0.16.0
 httpcore==1.0.9
