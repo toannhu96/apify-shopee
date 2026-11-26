@@ -38,8 +38,9 @@ class DirectError(RuntimeError):
     category = 'invalid_response'
 
     def __init__(self, message='', *, http_status=None, api_code=None, response_received=False,
-                 response_cookie_source=None):
+                 response_cookie_source=None, transport_code=None):
         super().__init__(message)
+        self.transport_code = transport_code if type(transport_code) is int and 1 <= transport_code <= 999 else None
         self.response_cookie_source = response_cookie_source
         self.response_received = response_received is True
         self.http_status = http_status if type(http_status) is int and 100 <= http_status <= 599 else None

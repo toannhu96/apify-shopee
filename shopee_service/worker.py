@@ -19,6 +19,9 @@ from .repository import FAILURES, Repository
 from .secrets import Cipher
 
 LOGGER = logging.getLogger(__name__)
+# Stable libcurl error codes. Only the corresponding fixed labels reach logs.
+_TRANSPORT_REASONS = {5: 'dns', 6: 'dns', 7: 'connection', 28: 'timeout',
+                      35: 'tls', 52: 'empty_reply', 55: 'send', 56: 'receive', 60: 'tls'}
 
 
 def _log_failure(phase, error=None):
@@ -27,8 +30,12 @@ def _log_failure(phase, error=None):
     status, code = getattr(error, 'http_status', None), getattr(error, 'api_code', None)
     status = status if type(status) is int and 100 <= status <= 599 else None
     code = code if type(code) is int and abs(code) < 10**10 else None
-    LOGGER.warning('Shopee failure phase=%s category=%s http_status=%s api_code=%s',
-                   phase, category, status, code)
+    transport_code = getattr(error, 'transport_code', None)
+    reason = _TRANSPORT_REASONS.get(transport_code) if type(transport_code) is int else None
+    if reason is None and category == 'transient' and status is None:
+        reason = 'unknown'
+    LOGGER.warning('Shopee failure phase=%s category=%s http_status=%s api_code=%s transport_reason=%s',
+                   phase, category, status, code, reason)
 
 
 def _fetch(work, fetch):

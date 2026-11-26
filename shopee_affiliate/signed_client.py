@@ -150,7 +150,7 @@ def _fetch_validated(identifier: str, generated: Mapping[str, str], cookie: str,
     except http_transport.TransportError as error:
         error_class = {'transient': direct.DirectTransientError, 'input': direct.DirectInputError}.get(
             error.category, direct.DirectError)
-        raise error_class(str(error)) from None
+        raise error_class(str(error), transport_code=error.transport_code) from None
     except ValueError:
         raise direct.DirectInputError('Generated request inputs are invalid') from None
     response_cookie_source = None

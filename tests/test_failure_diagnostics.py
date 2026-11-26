@@ -1,6 +1,8 @@
 """Failure diagnostics expose bounded facts, never supplied exception contents."""
 import json
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
+from enum import IntEnum
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
@@ -39,6 +41,7 @@ def test_worker_logs_api_failure_without_exception_contents(caplog):
 
 def test_diagnostic_logger_defends_against_mutated_metadata(caplog):
     error = direct.DirectError('SENSITIVE_SENTINEL')
+    error.transport_code = {'secret': 'SENSITIVE_SENTINEL'}
     error.category = 'SENSITIVE_SENTINEL'
     error.http_status = 'SENSITIVE_SENTINEL'
     error.api_code = {'secret': 'SENSITIVE_SENTINEL'}
@@ -100,3 +103,22 @@ def test_untrusted_api_code_is_not_attached(monkeypatch, code):
     assert caught.value.http_status == 200
     assert caught.value.api_code is None
     assert 'SENSITIVE_SENTINEL' not in str(caught.value)
+
+
+@pytest.mark.parametrize(('code', 'reason'), [
+    (28, 'timeout'), (6, 'dns'), (7, 'connection'), (60, 'tls'),
+    (12345, 'unknown'), ('SENSITIVE_SENTINEL', 'unknown'), ([], 'unknown'),
+])
+def test_worker_distinguishes_sanitized_transport_failures(monkeypatch, caplog, code, reason):
+    # No network: exercise the full exception translation from the transport to the log.
+    session = Mock()
+    error = OSError('SENSITIVE_SENTINEL')
+    error.code = IntEnum('CurlCode', {'TIMEOUT': 28}).TIMEOUT if code == 28 else code
+    session.get.side_effect = error
+    monkeypatch.setattr(http_transport, '_load_requests', lambda: SimpleNamespace(
+        Session=lambda **kwargs: nullcontext(session)))
+    with pytest.raises(direct.DirectTransientError) as caught:
+        signed_client._fetch_validated('123', {}, 'synthetic=1')
+    worker._log_failure('job_fetch', caught.value)
+    assert 'transport_reason=' + reason in caplog.text
+    assert 'SENSITIVE_SENTINEL' not in caplog.text and 'SENSITIVE_SENTINEL' not in str(caught.value)

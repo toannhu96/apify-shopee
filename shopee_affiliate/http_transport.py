@@ -36,9 +36,10 @@ ALLOWED_HEADERS = frozenset({
 class TransportError(RuntimeError):
     """Safe-to-display transport error without headers, cookies or response data."""
 
-    def __init__(self, message: str, *, category: str = 'transient') -> None:
+    def __init__(self, message: str, *, category: str = 'transient', transport_code: int | None = None) -> None:
         super().__init__(message)
         self.category = category
+        self.transport_code = transport_code
 
 
 @dataclass(frozen=True)
@@ -176,6 +177,9 @@ def request_product(target: str | int, *, headers: Mapping[str, str], cookie: st
     except Exception as error:  # noqa: BLE001 - transport exceptions may contain credentials
         message = 'Response exceeds the size limit' if too_large else 'Direct HTTPS request failed'
         category = 'invalid_response' if too_large else getattr(error, 'category', 'transient')
-        raise TransportError(message, category=category) from None
+        # curl_cffi may include a credential-bearing URL in exception text.
+        code = getattr(error, 'code', None)
+        transport_code = int(code) if isinstance(code, int) and not isinstance(code, bool) else None
+        raise TransportError(message, category=category, transport_code=transport_code) from None
     finally:
         buffer.close()
